@@ -72,7 +72,7 @@ const _sortedFromMap = (urlMap: Map<string, ScoredResult>): ScoredResult[] => {
 
 const _fetchRelatedSearches = async (query: string): Promise<string[]> => {
   try {
-    const res = await fetch(
+    const res = await outgoingFetch(
       `https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(query)}`,
     );
     const buf = await res.arrayBuffer();
@@ -103,7 +103,7 @@ const _fetchKnowledgePanel = async (
       format: "json",
       redirects: "1",
     });
-    const res = await fetch(
+    const res = await outgoingFetch(
       `https://en.wikipedia.org/w/api.php?${params.toString()}`,
       {
         headers: { "Api-User-Agent": "degoog/1.0" },

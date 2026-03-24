@@ -14,9 +14,14 @@ const DEGOOG_SETTINGS_ID = "degoog-settings";
 
 let allowedHosts: Set<string> | null = null;
 
+const BUILTIN_OUTGOING_HOSTS = [
+  "suggestqueries.google.com",
+  "en.wikipedia.org",
+];
+
 export function setOutgoingAllowlist(hosts: string[]): void {
   if (!hosts || hosts.length === 0) {
-    allowedHosts = new Set();
+    allowedHosts = new Set(BUILTIN_OUTGOING_HOSTS);
     return;
   }
   const normalized = hosts.map((h) => h.trim().toLowerCase()).filter(Boolean);
@@ -25,7 +30,7 @@ export function setOutgoingAllowlist(hosts: string[]): void {
     .split(",")
     .map((h) => h.trim().toLowerCase())
     .filter(Boolean);
-  allowedHosts = new Set([...normalized, ...fromEnv]);
+  allowedHosts = new Set([...BUILTIN_OUTGOING_HOSTS, ...normalized, ...fromEnv]);
 }
 
 let proxyIndex = 0;
