@@ -2,7 +2,7 @@ import type { AppState } from "./types";
 
 export const state: AppState = {
   currentQuery: "",
-  currentType: "all",
+  currentType: "web",
   currentPage: 1,
   lastPage: 10,
   currentResults: [],
@@ -12,6 +12,12 @@ export const state: AppState = {
   videoPage: 1,
   videoLastPage: 10,
   currentTimeFilter: "any",
+  customDateFrom: "",
+  customDateTo: "",
+  currentLanguage: "",
   mediaLoading: false,
   currentBangQuery: "",
+  openInNewTab: false,
+  displayEnginePerformance: true,
+  displaySearchSuggestions: true,
 };

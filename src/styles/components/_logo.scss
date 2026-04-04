@@ -1,30 +1,37 @@
-.logo-container {
+#home-logo {
   @include flex-center;
   padding-bottom: 24px;
 }
 
 .logo {
   font-size: $font-size-logo;
-  font-weight: 400;
-  font-family: 'Product Sans', $font-family;
+  font-weight: 500;
+  font-family: 'Google Sans', $font-family;
   margin: 0;
   user-select: none;
   letter-spacing: -2px;
+  display: flex;
+
+  &-d { color: $primary; }
+  &-e { color: $danger; }
+  &-g1 { color: $warning; }
+  &-o1 { color: $primary; }
+  &-o2 { color: $success; }
+  &-g2 { color: $danger; }
 }
 
-.logo-d { color: $primary; }
-.logo-e { color: $danger; }
-.logo-g1 { color: $warning; }
-.logo-o1 { color: $primary; }
-.logo-o2 { color: $success; }
-.logo-g2 { color: $danger; }
-
 .results-logo {
-  font-size: 22px;
-  font-weight: 400;
-  font-family: 'Product Sans', $font-family;
+  font-size: 40px;
+  font-weight: 500;
+  font-family: 'Google Sans', $font-family;
   text-decoration: none;
   letter-spacing: -1px;
   flex-shrink: 0;
   padding-right: 20px;
+  align-self: center;
+
+  @media (min-width: 767px) {
+    font-size: 30px;
+    margin-top: -5px;
+  }
 }

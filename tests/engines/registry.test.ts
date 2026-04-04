@@ -32,11 +32,11 @@ describe("engines registry", () => {
     expect(ddg!.displayName).toBe("DuckDuckGo");
   });
 
-  test("getEnginesForSearchType returns web engines for type all", () => {
+  test("getEnginesForSearchType returns web engines for type web", () => {
     const config: Record<string, boolean> = { duckduckgo: true, google: false };
-    const engines = getEnginesForSearchType("all", config);
+    const engines = getEnginesForSearchType("web", config);
     expect(engines.length).toBeGreaterThan(0);
-    expect(engines.some((e) => e.name === "DuckDuckGo")).toBe(true);
+    expect(engines.some((e) => e.instance.name === "DuckDuckGo")).toBe(true);
   });
 
   test("getEnginesForSearchType returns array for images type", () => {

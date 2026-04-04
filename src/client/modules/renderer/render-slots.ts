@@ -1,5 +1,5 @@
-import { escapeHtml } from "../../utils/dom";
 import { SlotPanelPosition, type SlotPanel } from "../../types";
+import { renderTemplate } from "../../utils/template";
 
 const SLOT_IDS = [
   "slot-above-results",
@@ -73,11 +73,11 @@ export function renderAtAGlance(
     container.innerHTML = "";
     return;
   }
-  container.innerHTML = `
-    <div class="glance-box">
-      <div class="glance-snippet">${escapeHtml(data.snippet)}</div>
-      <a class="glance-link" href="${escapeHtml(data.url)}" target="_blank">${escapeHtml(data.title)}</a>
-      <div class="glance-sources">Found on: ${data.sources.map((s) => `<span class="glance-source">${escapeHtml(s)}</span>`).join(", ")}</div>
-    </div>
-  `;
+  container.innerHTML = renderTemplate("degoog-at-a-glance", {
+    snippet: data.snippet,
+    url: data.url,
+    title: data.title,
+    sources: data.sources,
+    sources_text: data.sources.join(", "),
+  }) ?? "";
 }

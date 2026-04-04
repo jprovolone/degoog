@@ -1,0 +1,23 @@
+{
+  "name": "degoog",
+  "css": "style.css",
+  "html": {
+    "layout": "layout.html",
+    "index": "index.html",
+    "search": "search.html"
+  },
+  "templates": {
+    "search-header": "search-templates/header.html",
+    "search-tabs": "search-templates/tabs.html",
+    "search-media-preview": "search-templates/media-preview.html",
+    "search-lightbox": "search-templates/lightbox.html",
+    "result": "search-templates/result.html",
+    "image-card": "search-templates/image-card.html",
+    "video-card": "search-templates/video-card.html",
+    "at-a-glance": "search-templates/at-a-glance.html",
+    "home-header": "index-templates/header.html",
+    "home-logo": "index-templates/logo.html",
+    "home-search": "index-templates/search.html",
+    "home-footer": "index-templates/footer.html"
+  }
+}

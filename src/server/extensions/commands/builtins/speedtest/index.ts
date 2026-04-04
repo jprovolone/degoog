@@ -10,6 +10,11 @@ export const speedtestCommand: BangCommand = {
   name: "Speed Test",
   description: "Run an internet speed test",
   trigger: "speedtest",
+  naturalLanguagePhrases: [
+    "speed test",
+    "run a speed test",
+    "test my internet speed",
+  ],
   async execute(): Promise<CommandResult> {
     return {
       title: "Speed Test",

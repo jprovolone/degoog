@@ -2,14 +2,18 @@ import { initTheme } from "../../utils/theme";
 import { initInstallPrompt } from "../../utils/install-prompt";
 import {
   initGeneralTab,
-  initThemeSelectOnly,
+  initAppearanceSettings,
 } from "../../settings/general-tab";
 import { initEnginesTab } from "../../settings/engines-tab";
 import { initPluginsTab } from "../../settings/plugins-tab";
+import { initTransportsTab } from "../../settings/transports-tab";
 import { initThemesTab } from "../../settings/themes-tab";
+import { initServerTab } from "../../settings/server-tab";
 import { initStoreTab } from "../../settings/store-tab";
 import "../modals/settings-modal/modal";
+import { SETTINGS_TABS } from "../../../shared/settings-tabs";
 import type { AllExtensions } from "../../types";
+import { navigateSettingsBack } from "../../utils/navigation";
 
 declare global {
   interface Window {
@@ -18,6 +22,17 @@ declare global {
 }
 
 const TOKEN_KEY = "degoog-settings-token";
+
+function _initSettingsBackLink(): void {
+  document.body.addEventListener("click", (e) => {
+    const a = (e.target as HTMLElement).closest<HTMLAnchorElement>(
+      "a.settings-page-back",
+    );
+    if (!a) return;
+    e.preventDefault();
+    navigateSettingsBack();
+  });
+}
 
 export const getStoredToken = (): string | null =>
   sessionStorage.getItem(TOKEN_KEY) || null;
@@ -44,7 +59,7 @@ function _showAuthGate(): void {
   if (!page) return;
   page.innerHTML = `
     <header class="settings-page-header">
-      <a onclick="window.history.back()" class="settings-page-back">
+      <a href="/" class="settings-page-back">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M19 12H5M12 19l-7-7 7-7"/>
         </svg>
@@ -99,7 +114,7 @@ function _switchSettingsTab(value: string, updateUrl = true): void {
     .querySelectorAll<HTMLElement>(".settings-tab-panel")
     .forEach((p) => p.classList.remove("active"));
   document.getElementById(`tab-${value}`)?.classList.add("active");
-  document.querySelectorAll<HTMLElement>(".settings-tab-btn").forEach((b) => {
+  document.querySelectorAll<HTMLElement>(".settings-nav-item").forEach((b) => {
     b.classList.toggle("active", b.dataset.tab === value);
   });
   const select = document.getElementById(
@@ -119,19 +134,17 @@ function _initTabs(): void {
   ) as HTMLSelectElement | null;
   const nav = document.getElementById("settings-tabs-nav");
   select?.addEventListener("change", () => _switchSettingsTab(select.value));
-  nav?.querySelectorAll<HTMLElement>(".settings-tab-btn").forEach((btn) => {
+  nav?.querySelectorAll<HTMLElement>(".settings-nav-item").forEach((btn) => {
     btn.addEventListener("click", () =>
       _switchSettingsTab(btn.dataset.tab ?? "general"),
     );
   });
 
-  // Load tab from URL path
   const path = window.location.pathname;
   const match = path.match(/^\/settings\/(\w+)$/);
   if (match) {
     const tab = match[1];
-    const validTabs = ["general", "engines", "plugins", "themes", "store"];
-    if (validTabs.includes(tab)) {
+    if ((SETTINGS_TABS as readonly string[]).includes(tab)) {
       _switchSettingsTab(tab, false);
     }
   }
@@ -141,7 +154,8 @@ async function _initSettings(): Promise<void> {
   void initTheme();
   initInstallPrompt();
   _initTabs();
-  void initGeneralTab(getStoredToken);
+  void initGeneralTab();
+  void initServerTab(getStoredToken);
 
   try {
     const [extRes, themesRes] = await Promise.all([
@@ -156,15 +170,18 @@ async function _initSettings(): Promise<void> {
     const themesData = (await themesRes.json()) as { activeId: string | null };
     await initEnginesTab(allExtensions);
     initPluginsTab(allExtensions);
+    initTransportsTab(allExtensions);
     await initThemesTab(themesData, allExtensions.themes ?? []);
     const storeEl = document.getElementById("store-content");
     if (storeEl) void initStoreTab(storeEl, getStoredToken);
   } catch {
     const enginesEl = document.getElementById("engines-content");
     const pluginsEl = document.getElementById("plugins-content");
+    const transportsEl = document.getElementById("transports-content");
     const themesEl = document.getElementById("themes-content");
     if (enginesEl) enginesEl.innerHTML = "<p>Failed to load extensions.</p>";
     if (pluginsEl) pluginsEl.innerHTML = "<p>Failed to load extensions.</p>";
+    if (transportsEl) transportsEl.innerHTML = "<p>Failed to load transports.</p>";
     if (themesEl) themesEl.innerHTML = "<p>Failed to load themes.</p>";
   }
 }
@@ -179,12 +196,13 @@ window.addEventListener("extensions-saved", async () => {
     const allExtensions = (await res.json()) as AllExtensions;
     await initEnginesTab(allExtensions);
     initPluginsTab(allExtensions);
-  } catch { }
+    initTransportsTab(allExtensions);
+  } catch {}
 });
 
 async function _initPublicSettings(): Promise<void> {
   void initTheme();
-  void initThemeSelectOnly();
+  void initAppearanceSettings();
   try {
     const res = await fetch("/api/extensions");
     const allExtensions = (await res.json()) as AllExtensions;
@@ -196,6 +214,7 @@ async function _initPublicSettings(): Promise<void> {
 }
 
 async function _init(): Promise<void> {
+  _initSettingsBackLink();
   if (window.__DEGOOG_PUBLIC_INSTANCE__) {
     void _initPublicSettings();
     return;

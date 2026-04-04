@@ -218,7 +218,9 @@ export const renderField = (
       ? "password"
       : field.type === "url"
         ? "url"
-        : "text";
+        : field.type === "number"
+          ? "number"
+          : "text";
   return `
     <div class="ext-field" data-key="${escapeHtml(field.key)}" data-type="${escapeHtml(field.type)}" data-secret="${isSecret}" data-was-set="${isSet}">
       <label class="ext-field-label" for="field-${escapeHtml(field.key)}">${escapeHtml(field.label)}${field.required ? " <span class='ext-required'>*</span>" : ""}</label>

@@ -44,16 +44,23 @@
     />
     <link
       rel="manifest"
-      href="/public/favicon/site.webmanifest?v=__APP_VERSION__"
+      href="/public/favicon/site.webmanifest" crossorigin="use-credentials"
     />
     <title>Settings – degoog</title>
-    <link rel="stylesheet" href="/public/style.css?v=__APP_VERSION__" />
+    <link
+      rel="preload"
+      href="/public/themes/degoog-theme/fonts/google-sans/static/GoogleSans-Medium.ttf"
+      as="font"
+      type="font/ttf"
+      crossorigin
+    />
+    <link rel="stylesheet" href="/public/themes/degoog-theme/style.css?v=__APP_VERSION__" />
     __THEME_CSS__
   </head>
   <body class="settings-page-body">
     <div class="settings-page">
       <header class="settings-page-header">
-        <a onclick="window.history.back()" class="settings-page-back">
+        <a href="/" class="settings-page-back">
           <svg
             width="24"
             height="24"

@@ -4,6 +4,7 @@ export interface SearchResult {
   snippet: string;
   source: string;
   thumbnail?: string;
+  imageUrl?: string;
   duration?: string;
 }
 
@@ -74,12 +75,19 @@ export interface AppState {
   videoPage: number;
   videoLastPage: number;
   currentTimeFilter: string;
+  customDateFrom: string;
+  customDateTo: string;
+  currentLanguage: string;
   mediaLoading: boolean;
   currentBangQuery: string;
+  openInNewTab: boolean;
+  displayEnginePerformance: boolean;
+  displaySearchSuggestions: boolean;
 }
 
 export type SettingFieldType =
   | "text"
+  | "number"
   | "password"
   | "url"
   | "toggle"
@@ -96,6 +104,8 @@ export interface SettingField {
   description?: string;
   secret?: boolean;
   options?: string[];
+  default?: string;
+  advanced?: boolean;
 }
 
 export interface ExtensionMeta {
@@ -114,6 +124,7 @@ export interface AllExtensions {
   engines: ExtensionMeta[];
   plugins: ExtensionMeta[];
   themes: ExtensionMeta[];
+  transports: ExtensionMeta[];
 }
 
 export interface SearchBarAction {

@@ -4,10 +4,13 @@ import {
   getEngineRegistry,
   getDefaultEngineConfig,
 } from "../extensions/engines/registry";
+import { readFile } from "fs/promises";
+import { join } from "path";
 import {
   getThemeHtml,
   getActiveTheme,
   getActiveThemeDataAttrs,
+  getThemeTemplatesHtml,
 } from "../extensions/themes/registry";
 import {
   getAllPluginCss,
@@ -21,7 +24,34 @@ import {
   validateSettingsToken,
 } from "./settings-auth";
 import { isPublicInstance } from "../utils/public-instance";
+import { SETTINGS_TABS } from "../../shared/settings-tabs";
 import pkg from "../../../package.json";
+
+const DEFAULT_THEME_DIR = "src/public/themes/degoog-theme";
+
+interface DefaultThemeManifest {
+  templates?: Record<string, string>;
+}
+
+let defaultManifestCache: DefaultThemeManifest | null = null;
+
+async function getDefaultManifest(): Promise<DefaultThemeManifest> {
+  if (defaultManifestCache) return defaultManifestCache;
+  const raw = await readFile(join(DEFAULT_THEME_DIR, "theme.json"), "utf-8");
+  defaultManifestCache = JSON.parse(raw) as DefaultThemeManifest;
+  return defaultManifestCache;
+}
+
+async function getDefaultTemplatesHtml(): Promise<string> {
+  const manifest = await getDefaultManifest();
+  if (!manifest.templates) return "";
+  const parts: string[] = [];
+  for (const [id, filePath] of Object.entries(manifest.templates)) {
+    const content = await readFile(join(DEFAULT_THEME_DIR, filePath), "utf-8");
+    parts.push(`<template id="degoog-${id}">${content}</template>`);
+  }
+  return parts.join("\n");
+}
 
 const router = new Hono();
 
@@ -67,11 +97,55 @@ async function pluginAssetsPlaceholder(): Promise<string> {
 
 async function applyPagePlaceholders(html: string): Promise<string> {
   const themeAttrs = await getActiveThemeDataAttrs();
-  return html
-    .replaceAll("__APP_VERSION__", pkg.version)
+  let result = html
     .replace("__THEME_CSS__", themeCssPlaceholder())
     .replace("__THEME_ATTRS__", themeAttrs)
     .replace("__PLUGIN_ASSETS__", await pluginAssetsPlaceholder());
+  const defaultTemplates = await getDefaultTemplatesHtml();
+  const themeTemplates = await getThemeTemplatesHtml();
+  const allTemplates = [defaultTemplates, themeTemplates]
+    .filter(Boolean)
+    .join("\n");
+  if (result.includes("__THEME_TEMPLATES__")) {
+    result = result.replace("__THEME_TEMPLATES__", allTemplates);
+  } else if (allTemplates) {
+    result = result.replace("</body>", `${allTemplates}\n</body>`);
+  }
+  return result.replaceAll("__APP_VERSION__", pkg.version);
+}
+
+function isFullDocument(html: string): boolean {
+  const trimmed = html.trimStart().toLowerCase();
+  return trimmed.startsWith("<!doctype") || trimmed.startsWith("<html");
+}
+
+async function getLayout(): Promise<string> {
+  const themeLayout = await getThemeHtml("layout");
+  if (themeLayout) return themeLayout;
+  return Bun.file(`${DEFAULT_THEME_DIR}/layout.html`).text();
+}
+
+async function buildLayoutPage(
+  pageName: string,
+  bodyClass?: string,
+): Promise<string> {
+  const layout = await getLayout();
+  const pageContent = await Bun.file(`${DEFAULT_THEME_DIR}/${pageName}`).text();
+  const html = layout
+    .replace("__PAGE_CONTENT__", pageContent)
+    .replace("__BODY_CLASS__", bodyClass ? `class="${bodyClass}"` : "");
+  return applyPagePlaceholders(html);
+}
+
+async function buildThemedLayoutPage(
+  themePageHtml: string,
+  bodyClass?: string,
+): Promise<string> {
+  const layout = await getLayout();
+  const html = layout
+    .replace("__PAGE_CONTENT__", themePageHtml)
+    .replace("__BODY_CLASS__", bodyClass ? `class="${bodyClass}"` : "");
+  return applyPagePlaceholders(html);
 }
 
 async function buildPage(filename: string): Promise<string> {
@@ -87,17 +161,26 @@ router.get("/", async (c) => {
   }
   const override = await getThemeHtml("index");
   if (override) {
-    return c.html(await applyPagePlaceholders(override));
+    if (isFullDocument(override)) {
+      return c.html(await applyPagePlaceholders(override));
+    }
+    return c.html(await buildThemedLayoutPage(override));
   }
-  return c.html(await buildPage("index.html"));
+  return c.html(await buildLayoutPage("index.html"));
 });
 
 router.get("/search", async (c) => {
   const override = await getThemeHtml("search");
-  if (override) return c.html(await applyPagePlaceholders(override));
-  return c.html(await buildPage("search.html"));
+  if (override) {
+    if (isFullDocument(override)) {
+      return c.html(await applyPagePlaceholders(override));
+    }
+    return c.html(await buildThemedLayoutPage(override, "has-results"));
+  }
+  return c.html(await buildLayoutPage("search.html", "has-results"));
 });
 
+router.get("/settings/", (c) => c.redirect("/settings", 301));
 router.get("/settings", async (c) => {
   if (isPublicInstance())
     return c.html(await buildPage("settings-public.html"));
@@ -110,8 +193,7 @@ router.get("/settings", async (c) => {
 router.get("/settings/:tab", async (c) => {
   if (isPublicInstance()) return c.redirect("/settings", 302);
   const tab = c.req.param("tab");
-  const validTabs = ["general", "engines", "plugins", "themes", "store"];
-  if (!validTabs.includes(tab)) {
+  if (!(SETTINGS_TABS as readonly string[]).includes(tab)) {
     return c.redirect("/settings", 302);
   }
   if (await shouldServeSettingsGate(c)) {

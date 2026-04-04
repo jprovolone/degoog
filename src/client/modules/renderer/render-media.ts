@@ -2,7 +2,9 @@ import { state } from "../../state";
 import { escapeHtml, cleanHostname } from "../../utils/dom";
 import { proxyImageUrl } from "../../utils/url";
 import { openMediaPreview, registerAppendMediaCards } from "../media/media";
-import type { ScoredResult } from "../../types";
+import { setupRetryLinks } from "./render-sidebar";
+import { renderTemplate } from "../../utils/template";
+import type { ScoredResult, EngineTiming } from "../../types";
 
 const _getImageColumnCount = (): number => {
   const w = window.innerWidth;
@@ -52,6 +54,15 @@ function _handleResize(): void {
 
 let _resizeListenerAdded = false;
 
+const _buildMediaContext = (r: ScoredResult): Record<string, unknown> => ({
+  title: r.title,
+  url: r.url,
+  thumbnail_url: proxyImageUrl(r.thumbnail || ""),
+  hostname: cleanHostname(r.url),
+  duration: r.duration || "",
+  sources: r.sources,
+});
+
 export function appendMediaCards(
   grid: HTMLElement,
   results: ScoredResult[],
@@ -60,6 +71,7 @@ export function appendMediaCards(
   const cardClass = type === "image" ? "image-card" : "video-card";
   const selector = `.${cardClass}`;
   const startIdx = grid.querySelectorAll(`.${cardClass}`).length;
+  const templateId = type === "image" ? "degoog-image-card" : "degoog-video-card";
 
   if (type === "image") {
     _ensureImageColumns(grid);
@@ -72,14 +84,7 @@ export function appendMediaCards(
       const card = document.createElement("div");
       card.className = cardClass;
       card.dataset.idx = String(idx);
-      card.innerHTML = `
-        <div class="image-thumb-wrap">
-          <img class="image-thumb" src="${escapeHtml(proxyImageUrl(r.thumbnail || ""))}" alt="${escapeHtml(r.title)}" loading="lazy" onerror="this.parentElement.parentElement.style.display='none'">
-        </div>
-        <div class="image-info">
-          <span class="image-title">${escapeHtml(r.title)}</span>
-          <span class="image-source">${escapeHtml(cleanHostname(r.url))}</span>
-        </div>`;
+      card.innerHTML = renderTemplate(templateId, _buildMediaContext(r)) ?? "";
       card.addEventListener("click", () => {
         openMediaPreview(state.currentResults[idx], idx, selector);
       });
@@ -97,18 +102,7 @@ export function appendMediaCards(
       const card = document.createElement("div");
       card.className = cardClass;
       card.dataset.idx = String(idx);
-      card.innerHTML = `
-        <div class="video-thumb-wrap">
-          <img class="video-thumb" src="${escapeHtml(proxyImageUrl(r.thumbnail || ""))}" alt="${escapeHtml(r.title)}" loading="lazy" onerror="this.style.display='none'">
-          ${r.duration ? `<span class="video-duration">${escapeHtml(r.duration)}</span>` : ""}
-          <div class="video-play-icon">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          </div>
-        </div>
-        <div class="video-info">
-          <span class="video-title">${escapeHtml(r.title)}</span>
-          <span class="video-source">${escapeHtml(cleanHostname(r.url))}</span>
-        </div>`;
+      card.innerHTML = renderTemplate(templateId, _buildMediaContext(r)) ?? "";
       card.addEventListener("click", () => {
         openMediaPreview(state.currentResults[idx], idx, selector);
       });
@@ -144,4 +138,22 @@ export function renderVideoGrid(
     grid = container.querySelector<HTMLElement>(".video-grid")!;
   }
   appendMediaCards(grid, results, "video");
+}
+
+export function renderMediaEngineBar(timings: EngineTiming[]): void {
+  const el = document.getElementById("results-meta");
+  if (!el) return;
+  el.querySelector(".media-engine-bar")?.remove();
+  if (!timings.length) return;
+  const tags = timings
+    .map((et) => {
+      const hit = et.resultCount > 0;
+      return `<span class="result-engine-tag${hit ? "" : " media-engine-tag--miss"}">${escapeHtml(et.name)} · ${et.resultCount} <a class="engine-retry-link" data-engine="${escapeHtml(et.name)}">retry</a></span>`;
+    })
+    .join("");
+  const bar = document.createElement("div");
+  bar.className = "media-engine-bar";
+  bar.innerHTML = tags;
+  el.appendChild(bar);
+  setupRetryLinks(bar);
 }

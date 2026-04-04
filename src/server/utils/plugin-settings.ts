@@ -33,7 +33,7 @@ const load = async (): Promise<PluginSettingsStore> => {
     cache = {};
   }
   return cache;
-}
+};
 
 async function persist(store: PluginSettingsStore): Promise<void> {
   await mkdir(dirname(SETTINGS_PATH), { recursive: true });
@@ -45,12 +45,12 @@ export const getSettings = async (
 ): Promise<Record<string, SettingValue>> => {
   const store = await load();
   return store[id] ?? {};
-}
+};
 
 export const isDisabled = async (id: string): Promise<boolean> => {
   const settings = await getSettings(id);
   return settings["disabled"] === "true";
-}
+};
 
 export const mergeDefaults = (
   stored: Record<string, SettingValue>,
@@ -64,7 +64,7 @@ export const mergeDefaults = (
   }
 
   return { ...out, ...stored };
-}
+};
 
 export async function setSettings(
   id: string,
@@ -79,7 +79,7 @@ export async function setSettings(
 
 export const getAllSettings = async (): Promise<PluginSettingsStore> => {
   return load();
-}
+};
 
 export async function removeSettings(id: string): Promise<void> {
   const store = await load();
@@ -101,7 +101,7 @@ export const maskSecrets = (
   }
 
   return masked;
-}
+};
 
 export const mergeSecrets = (
   incoming: Record<string, SettingValue>,
@@ -120,4 +120,4 @@ export const mergeSecrets = (
   }
 
   return merged;
-}
+};

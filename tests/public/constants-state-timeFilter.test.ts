@@ -8,7 +8,7 @@ import {
   MAX_PAGE,
 } from "../../src/client/constants";
 import { state } from "../../src/client/state";
-import { initTimeFilter } from "../../src/client/utils/time-filter";
+import { initOptionsDropdown } from "../../src/client/utils/time-filter";
 
 describe("public/constants", () => {
   test("DB_NAME is string", () => {
@@ -33,14 +33,14 @@ describe("public/constants", () => {
 describe("public/state", () => {
   test("state has expected keys", () => {
     expect(state).toHaveProperty("currentQuery");
-    expect(state).toHaveProperty("currentType", "all");
+    expect(state).toHaveProperty("currentType", "web");
     expect(state).toHaveProperty("currentPage", 1);
     expect(state).toHaveProperty("currentTimeFilter", "any");
   });
 });
 
 describe("public/timeFilter", () => {
-  test("initTimeFilter is function", () => {
-    expect(typeof initTimeFilter).toBe("function");
+  test("initOptionsDropdown is function", () => {
+    expect(typeof initOptionsDropdown).toBe("function");
   });
 });

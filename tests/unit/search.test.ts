@@ -1,9 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import {
-  aggregateAndScore,
-  mergeNewResults,
-  resolveEngine,
-} from "../../src/server/search";
+import { mergeNewResults, resolveEngine, scoreResults } from "../../src/server/search";
 import type { SearchResult, ScoredResult } from "../../src/server/types";
 
 const result = (
@@ -25,49 +21,6 @@ const scored = (
 ): ScoredResult => ({ ...r, score, sources });
 
 describe("search", () => {
-  describe("aggregateAndScore", () => {
-    test("merges results from multiple engines and dedupes by URL", () => {
-      const engine1 = [
-        result("https://a.com", "E1"),
-        result("https://b.com", "E1"),
-      ];
-      const engine2 = [
-        result("https://a.com", "E2"),
-        result("https://c.com", "E2"),
-      ];
-      const out = aggregateAndScore([engine1, engine2]);
-      expect(out.length).toBe(3);
-      const a = out.find((r) => r.url === "https://a.com");
-      expect(a).toBeDefined();
-      expect(a!.sources).toContain("E1");
-      expect(a!.sources).toContain("E2");
-      expect(a!.score).toBeGreaterThan(1);
-    });
-
-    test("sorts by score descending", () => {
-      const engine1 = [result("https://first.com", "E1")];
-      const engine2 = [
-        result("https://second.com", "E2"),
-        result("https://first.com", "E2"),
-      ];
-      const out = aggregateAndScore([engine1, engine2]);
-      expect(out[0].url).toBe("https://first.com");
-    });
-
-    test("returns empty array for empty input", () => {
-      expect(aggregateAndScore([])).toEqual([]);
-      expect(aggregateAndScore([[], []])).toEqual([]);
-    });
-
-    test("prefers longer snippet when merging same URL", () => {
-      const r1 = result("https://x.com", "E1", "t", "short");
-      const r2 = result("https://x.com", "E2", "t", "much longer snippet");
-      const out = aggregateAndScore([[r1], [r2]]);
-      expect(out.length).toBe(1);
-      expect(out[0].snippet).toBe("much longer snippet");
-    });
-  });
-
   describe("mergeNewResults", () => {
     test("merges new results into existing scored list", () => {
       const existing: ScoredResult[] = [
@@ -89,6 +42,33 @@ describe("search", () => {
       const newResults = [result("https://a.com", "E2")];
       const out = mergeNewResults(existing, newResults);
       expect(out[0].url).toBe("https://a.com");
+    });
+  });
+
+  describe("scoreResults", () => {
+    test("merges results from multiple engines", () => {
+      const out = scoreResults([
+        { results: [result("https://a.com", "E1"), result("https://b.com", "E1")] },
+        { results: [result("https://b.com", "E2"), result("https://c.com", "E2")] },
+      ]);
+      const b = out.find((r) => r.url === "https://b.com");
+      expect(b!.sources).toContain("E1");
+      expect(b!.sources).toContain("E2");
+    });
+
+    test("higher multiplier pushes engine results up", () => {
+      const out = scoreResults([
+        { results: [result("https://low.com", "E1")], multiplier: 1 },
+        { results: [result("https://high.com", "E2")], multiplier: 5 },
+      ]);
+      expect(out[0].url).toBe("https://high.com");
+    });
+
+    test("equal multipliers sort by position", () => {
+      const out = scoreResults([
+        { results: [result("https://first.com", "E1"), result("https://second.com", "E1")] },
+      ]);
+      expect(out[0].url).toBe("https://first.com");
     });
   });
 

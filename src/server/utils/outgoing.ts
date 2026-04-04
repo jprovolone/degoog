@@ -1,16 +1,38 @@
-import { fetch as undiciFetch, ProxyAgent } from "undici";
-import { getSettings } from "./plugin-settings";
-import { debug } from "./logger";
+/**
+ * @fccview here
+ * scraping is a crazy business. This shit is hard.
+ * For example, our big G has very strict TLS policies, which means sometimes it'll
+ * randomly block bun's fetch.
+ *
+ * The best solution I could come up with is to use curl binaries as fallback for requests.
+ * Until/if bun implements TLS pinning, this is the best we can do.
+ *
+ * Also bun doesn't support socks5 proxies, so we use a separate library for that. How fun.
+ *
+ */
 
-export interface OutgoingFetchOptions {
-  method?: string;
-  headers?: Record<string, string>;
-  body?: string;
-  redirect?: RequestRedirect;
-  signal?: AbortSignal;
-}
+import { fetch as bunFetch } from "bun";
+import { getSettings } from "./plugin-settings";
+import { isSocksProxy, fetchViaSocks } from "./socks-fetch";
+import { fetchViaHttpProxy } from "./http-proxy-fetch";
+import { resolveTransport } from "../extensions/transports/registry";
+import { debug } from "./logger";
+import type {
+  Transport,
+  TransportFetchOptions,
+  TransportContext,
+  ProxyAwareFetch,
+} from "../extensions/transports/types";
+
+export type { TransportFetchOptions as OutgoingFetchOptions };
 
 const DEGOOG_SETTINGS_ID = "degoog-settings";
+
+export type OutgoingTransport = string;
+
+export function parseOutgoingTransport(raw: string | undefined): string {
+  return raw?.trim() || "fetch";
+}
 
 let allowedHosts: Set<string> | null = null;
 
@@ -58,38 +80,83 @@ export function isUrlAllowedForOutgoing(url: string): boolean {
   return allowedHosts.has(host);
 }
 
-export async function outgoingFetch(
-  url: string,
-  options: OutgoingFetchOptions = {},
-): Promise<Response> {
+function _buildProxyFetch(
+  proxyUrl?: string,
+  timeoutMs?: number,
+): ProxyAwareFetch {
+  return async (url: string, init?: RequestInit): Promise<Response> => {
+    const method = init?.method ?? "GET";
+    const redirect = init?.redirect ?? "follow";
+    const signal = init?.signal ?? undefined;
+    const headers = init?.headers as Record<string, string> | undefined;
+    const body = typeof init?.body === "string" ? init.body : undefined;
+
+    if (!proxyUrl) {
+      return bunFetch(url, { method, redirect, signal, headers, body });
+    }
+
+    if (isSocksProxy(proxyUrl)) {
+      return fetchViaSocks(
+        url,
+        proxyUrl,
+        {
+          method,
+          redirect,
+          signal,
+          headers,
+          body,
+        },
+        timeoutMs,
+      );
+    }
+
+    return fetchViaHttpProxy(
+      url,
+      proxyUrl,
+      {
+        method,
+        redirect,
+        signal,
+        headers,
+        body,
+      },
+      timeoutMs,
+    );
+  };
+}
+
+async function buildTransportContext(
+  transportName: string,
+): Promise<{ transport: Transport; context: TransportContext }> {
   const settings = await getSettings(DEGOOG_SETTINGS_ID);
   const enabled = settings.proxyEnabled === "true";
   const proxyUrlsRaw = settings.proxyUrls;
   const urls = parseProxyUrls(
     typeof proxyUrlsRaw === "string" ? proxyUrlsRaw : "",
   );
-
   const useProxy = enabled && urls.length > 0;
-  const method = options.method ?? "GET";
-  const redirect = options.redirect ?? "follow";
-  const signal = options.signal;
-  const headers = options.headers;
-  const body = options.body;
+  const proxyUrl = useProxy ? urls[proxyIndex++ % urls.length] : undefined;
+  const transport = resolveTransport(transportName);
+  return {
+    transport,
+    context: {
+      proxyUrl,
+      fetch: _buildProxyFetch(proxyUrl, transport.timeoutMs),
+    },
+  };
+}
 
-  if (!useProxy) {
-    debug("outgoing", `direct fetch ${new URL(url).hostname}`);
-    return fetch(url, { method, redirect, signal, headers, body });
+export async function outgoingFetch(
+  url: string,
+  options: TransportFetchOptions = {},
+  transportName: string = "fetch",
+): Promise<Response> {
+  const { transport, context } = await buildTransportContext(transportName);
+  const host = new URL(url).hostname;
+  if (context.proxyUrl) {
+    debug("outgoing", `${transport.name} via ${context.proxyUrl} -> ${host}`);
+  } else {
+    debug("outgoing", `${transport.name} -> ${host}`);
   }
-
-  const proxyUrl = urls[proxyIndex++ % urls.length];
-  debug("outgoing", `via proxy ${proxyUrl} -> ${new URL(url).hostname}`);
-  const agent = new ProxyAgent(proxyUrl);
-  return undiciFetch(url, {
-    method,
-    redirect,
-    signal,
-    headers,
-    body: body ?? undefined,
-    dispatcher: agent,
-  }) as unknown as Promise<Response>;
+  return transport.fetch(url, options, context);
 }

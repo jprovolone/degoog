@@ -26,21 +26,24 @@
 }
 
 .sidebar-accordion-body {
-  padding: 16px;
+  display: none;
+  padding: 0 16px 16px;
+
+  @media (min-width: 768px) {
+    display: block;
+    padding: 16px;
+  }
 }
 
-@media (max-width: 767px) {
-  .sidebar-accordion-body {
-    display: none;
-    padding: 0 16px 16px;
-  }
+.sidebar-accordion {
+  &.open {
+    .sidebar-accordion-body {
+      display: block;
+    }
 
-  .sidebar-accordion.open .sidebar-accordion-body {
-    display: block;
-  }
-
-  .sidebar-accordion.open .accordion-chevron {
-    transform: rotate(180deg);
+    .accordion-chevron {
+      transform: rotate(180deg);
+    }
   }
 }
 
@@ -92,11 +95,11 @@
   &:last-child {
     margin-bottom: 0;
   }
+}
 
-  .engine-retry-link {
-    font-size: 11px;
-    cursor: pointer;
-  }
+.engine-retry-link {
+  font-size: 11px;
+  cursor: pointer;
 }
 
 .engine-stat-label {

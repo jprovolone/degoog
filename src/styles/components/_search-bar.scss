@@ -1,4 +1,4 @@
-.search-container {
+#home-search {
   @include flex-center;
   flex-direction: column;
   width: 100%;
@@ -14,6 +14,7 @@
 .results-search-bar {
   @include search-bar-base;
   width: 100%;
+  position: relative;
 
   .search-icon {
     flex-shrink: 0;
@@ -122,21 +123,15 @@
   flex-shrink: 0;
 }
 
-.search-bar,
-.results-search-bar {
-  position: relative;
-}
-
 .ac-dropdown {
   display: none;
   position: absolute;
   top: calc(100%);
   left: 0;
   right: 0;
-  background: var(--bg);
+  background: var(--search-bar-bg);
   border-radius: 0 0 $search-bar-radius $search-bar-radius;
   z-index: 100;
-  background: var(--search-bar-bg);
   overflow: hidden;
 }
 

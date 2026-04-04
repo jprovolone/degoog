@@ -1,6 +1,6 @@
 import { state } from "../state";
 import { MAX_PAGE, BUILTIN_SEARCH_TYPES } from "../constants";
-import { showResults, setActiveTab } from "./navigation";
+import { setActiveTab } from "./navigation";
 import { getEngines } from "./engines";
 import { buildSearchUrl } from "./url";
 import { buildPaginationHtml } from "./pagination";
@@ -12,9 +12,9 @@ import { renderAtAGlance } from "../modules/renderer/render-slots";
 import {
   renderResults,
   renderSidebar,
-  renderSlotPanels,
   clearSlotPanels,
 } from "../modules/renderer/render";
+import { renderMediaEngineBar } from "../modules/renderer/render-media";
 import { hideAcDropdown } from "./autocomplete";
 import {
   setResultsMeta,
@@ -26,10 +26,30 @@ import {
   fetchSlotPanels,
   buildCommandGlanceHtml,
 } from "./search-utils";
-import { skeletonResults, skeletonGlance } from "../animations/skeleton";
-import { SlotPanelPosition, type Command, type SearchResponse, type ScoredResult } from "../types";
+import { skeletonResults, skeletonGlance, skeletonImageGrid, skeletonVideoGrid } from "../animations/skeleton";
+import { type Command, type SearchResponse, type ScoredResult } from "../types";
+import { performStreamingSearch, abortStreamingSearch } from "./streaming-search";
 
 let commandsCache: Command[] | null = null;
+let _streamingConfig: { enabled: boolean } | null = null;
+
+const _fetchStreamingConfig = async (): Promise<boolean> => {
+  if (_streamingConfig) return _streamingConfig.enabled;
+  try {
+    const res = await fetch("/api/settings/streaming");
+    if (res.ok) {
+      _streamingConfig = (await res.json()) as { enabled: boolean };
+      return _streamingConfig.enabled;
+    }
+  } catch {}
+  return false;
+};
+
+if (typeof window !== "undefined") {
+  window.addEventListener("extensions-saved", () => {
+    _streamingConfig = null;
+  });
+}
 
 if (typeof window !== "undefined") {
   window.addEventListener("extensions-saved", () => {
@@ -55,7 +75,7 @@ export async function performSearch(
   type?: string,
   page?: number,
 ): Promise<void> {
-  const resolvedType = type || state.currentType || "all";
+  const resolvedType = type || state.currentType || "web";
   if (!query.trim()) return;
 
   if (resolvedType.startsWith("tab:")) {
@@ -68,7 +88,7 @@ export async function performSearch(
     const prefix = prefixMatch[1].toLowerCase();
     const actualQuery = prefixMatch[2].trim();
     if (actualQuery) {
-      if (prefix !== "all" && BUILTIN_SEARCH_TYPES.has(prefix)) {
+      if (prefix !== "web" && BUILTIN_SEARCH_TYPES.has(prefix)) {
         return performSearch(actualQuery, prefix, page);
       }
       const { getPluginTabIds } = await import("../modules/tabs/tabs");
@@ -85,6 +105,11 @@ export async function performSearch(
     return _performBangCommand(query, resolvedType, page || 1);
   }
 
+  if ((!page || page === 1) && await _fetchStreamingConfig()) {
+    abortStreamingSearch();
+    return performStreamingSearch(query, resolvedType, (q) => void performSearch(q));
+  }
+
   state.currentQuery = query;
   state.currentType = resolvedType;
   state.currentPage = 1;
@@ -98,7 +123,7 @@ export async function performSearch(
   const engines = await getEngines();
   const url = buildSearchUrl(query, engines, resolvedType, 1);
 
-  showResults();
+
   setActiveTab(resolvedType);
   closeMediaPreview();
   hideAcDropdown(document.getElementById("ac-dropdown-home"));
@@ -107,17 +132,28 @@ export async function performSearch(
     "results-search-input",
   ) as HTMLInputElement | null;
   if (resultsInput) resultsInput.value = query;
+  const layout = document.getElementById("results-layout");
+  if (resolvedType === "images" || resolvedType === "videos") {
+    layout?.classList.add("media-mode");
+  } else {
+    layout?.classList.remove("media-mode");
+  }
   const resultsMeta = document.getElementById("results-meta");
   if (resultsMeta) resultsMeta.textContent = "Searching...";
-  const useSkeleton = resolvedType === "all" || resolvedType === "news";
   const glanceEl = document.getElementById("at-a-glance");
   if (glanceEl)
-    glanceEl.innerHTML = resolvedType === "all" ? skeletonGlance() : "";
+    glanceEl.innerHTML = resolvedType === "web" ? skeletonGlance() : "";
   const resultsList = document.getElementById("results-list");
   if (resultsList) {
-    resultsList.innerHTML = useSkeleton
-      ? skeletonResults()
-      : '<div class="loading-dots"><span></span><span></span><span></span></div>';
+    if (resolvedType === "web" || resolvedType === "news") {
+      resultsList.innerHTML = skeletonResults();
+    } else if (resolvedType === "images") {
+      resultsList.innerHTML = skeletonImageGrid();
+    } else if (resolvedType === "videos") {
+      resultsList.innerHTML = skeletonVideoGrid();
+    } else {
+      resultsList.innerHTML = skeletonResults();
+    }
   }
   const pagination = document.getElementById("pagination");
   if (pagination) pagination.innerHTML = "";
@@ -127,7 +163,7 @@ export async function performSearch(
   document.title = `${query} - degoog`;
 
   const urlParams = new URLSearchParams({ q: query });
-  if (resolvedType !== "all") urlParams.set("type", resolvedType);
+  if (resolvedType !== "web") urlParams.set("type", resolvedType);
   history.pushState(null, "", `/search?${urlParams.toString()}`);
 
   const commands = await _fetchCommands();
@@ -151,21 +187,15 @@ export async function performSearch(
     const isMediaType = resolvedType === "images" || resolvedType === "videos";
     if (isMediaType) {
       if (glanceEl) glanceEl.innerHTML = "";
+      renderMediaEngineBar(data.engineTimings ?? []);
       if (sidebar) sidebar.innerHTML = "";
     } else {
-      const sidebarTop =
-        data.slotPanels?.filter((p) => p.position === SlotPanelPosition.KnowledgePanel) ?? [];
-      renderSidebar(data, (q) => void performSearch(q), {
-        sidebarTopPanels: sidebarTop,
-      });
-      if (resolvedType === "all") {
-        renderSlotPanels(data.slotPanels || []);
+      renderSidebar(data, (q) => void performSearch(q));
+      if (resolvedType === "web") {
         void fetchGlancePanels(query, data.results, data.atAGlance);
-        if (!data.slotPanels || data.slotPanels.length === 0)
-          void fetchSlotPanels(query);
+        void fetchSlotPanels(query);
       } else {
         if (glanceEl) glanceEl.innerHTML = "";
-        renderSlotPanels(data.slotPanels || []);
       }
     }
     renderResults(data.results);
@@ -200,24 +230,19 @@ async function _performSearchWithBang(
     const isMediaType = type === "images" || type === "videos";
     if (isMediaType) {
       if (glanceEl) glanceEl.innerHTML = "";
+      renderMediaEngineBar(searchData.engineTimings ?? []);
       if (sidebar) sidebar.innerHTML = "";
     } else {
-      const sidebarTop =
-        searchData.slotPanels?.filter((p) => p.position === SlotPanelPosition.KnowledgePanel) ?? [];
-      renderSidebar(searchData, (q) => void performSearch(q), {
-        sidebarTopPanels: sidebarTop,
-      });
-      if (type === "all") {
-        renderSlotPanels(searchData.slotPanels || []);
+      renderSidebar(searchData, (q) => void performSearch(q));
+      if (type === "web") {
         void fetchSlotPanels(query);
       } else {
         if (glanceEl) glanceEl.innerHTML = "";
-        renderSlotPanels(searchData.slotPanels || []);
       }
     }
     renderResults(searchData.results);
 
-    if (glanceEl && cmdRes.ok) {
+    if (glanceEl && cmdRes.ok && !isMediaType) {
       const cmdData = (await cmdRes.json()) as {
         type: string;
         results?: ScoredResult[];
@@ -246,7 +271,7 @@ async function _performBangCommand(
   _type: string,
   page = 1,
 ): Promise<void> {
-  showResults();
+
   closeMediaPreview();
   hideAcDropdown(document.getElementById("ac-dropdown-home"));
   hideAcDropdown(document.getElementById("ac-dropdown-results"));
@@ -338,7 +363,7 @@ function _renderBangPagination(
       e.preventDefault();
       const pageNum = parseInt(el.dataset.page ?? "0", 10);
       if (pageNum >= 1 && pageNum <= totalPages) {
-        void _performBangCommand(query, "all", pageNum);
+        void _performBangCommand(query, "web", pageNum);
       }
     });
   });
@@ -346,14 +371,19 @@ function _renderBangPagination(
 
 export async function goToPage(pageNum: number): Promise<void> {
   if (pageNum === state.currentPage) return;
-  const useSkeleton =
-    state.currentType === "all" || state.currentType === "news";
   const resultsList = document.getElementById("results-list");
   const pagination = document.getElementById("pagination");
-  if (resultsList)
-    resultsList.innerHTML = useSkeleton
-      ? skeletonResults()
-      : '<div class="loading-dots"><span></span><span></span><span></span></div>';
+  if (resultsList) {
+    if (state.currentType === "web" || state.currentType === "news") {
+      resultsList.innerHTML = skeletonResults();
+    } else if (state.currentType === "images") {
+      resultsList.innerHTML = skeletonImageGrid();
+    } else if (state.currentType === "videos") {
+      resultsList.innerHTML = skeletonVideoGrid();
+    } else {
+      resultsList.innerHTML = skeletonResults();
+    }
+  }
   if (pagination) pagination.innerHTML = "";
   const engines = await getEngines();
   const url = buildSearchUrl(
@@ -373,12 +403,8 @@ export async function goToPage(pageNum: number): Promise<void> {
     if (state.currentPage === 1 && data.atAGlance) {
       renderAtAGlance(data.atAGlance);
     }
-    if (
-      state.currentType === "all" &&
-      data.slotPanels &&
-      data.slotPanels.length > 0
-    ) {
-      renderSlotPanels(data.slotPanels);
+    if (state.currentType === "web") {
+      void fetchSlotPanels(state.currentQuery);
     }
     renderResults(state.currentResults);
     window.scrollTo(0, 0);
@@ -400,7 +426,7 @@ export async function retryEngine(engineName: string): Promise<void> {
   for (const [key, val] of Object.entries(engines)) {
     params.set(key, String(val));
   }
-  if (state.currentType && state.currentType !== "all") {
+  if (state.currentType && state.currentType !== "web") {
     params.set("type", state.currentType);
   }
   if (state.currentPage > 1) {
@@ -431,7 +457,7 @@ export async function retryEngine(engineName: string): Promise<void> {
       if (resultsMeta)
         resultsMeta.textContent = `About ${data.results.length} results (${((state.currentData?.totalTime ?? 0) / 1000).toFixed(2)} seconds)`;
 
-      if (state.currentType === "all" && state.currentData?.atAGlance) {
+      if (state.currentType === "web" && state.currentData?.atAGlance) {
         renderAtAGlance(state.currentData.atAGlance);
       }
       renderResults(data.results);
@@ -439,14 +465,10 @@ export async function retryEngine(engineName: string): Promise<void> {
 
     const isMediaType =
       state.currentType === "images" || state.currentType === "videos";
-    if (!isMediaType && state.currentData) {
-      const sidebarTop =
-        state.currentData.slotPanels?.filter(
-          (p) => p.position === SlotPanelPosition.KnowledgePanel,
-        ) ?? [];
-      renderSidebar(state.currentData, (q) => void performSearch(q), {
-        sidebarTopPanels: sidebarTop,
-      });
+    if (isMediaType && state.currentData) {
+      renderMediaEngineBar(state.currentData.engineTimings ?? []);
+    } else if (state.currentData) {
+      renderSidebar(state.currentData, (q) => void performSearch(q));
     }
   } catch { }
 }

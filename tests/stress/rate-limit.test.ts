@@ -1,13 +1,16 @@
-import { describe, test, expect, mock } from "bun:test";
+import { describe, test, expect, afterEach } from "bun:test";
+import { setSettings, removeSettings } from "../../src/server/utils/plugin-settings";
 import { clearRateLimitState } from "../../src/server/utils/rate-limit";
 
-const PLUGIN_SETTINGS_PATH = "../../src/server/utils/plugin-settings";
+const SETTINGS_ID = "degoog-settings";
 
 describe("routes/rate-limit", () => {
+  afterEach(() => {
+    clearRateLimitState();
+  });
+
   test("GET /api/rate-limit/test when rate limit disabled returns 200 with rateLimitEnabled false", async () => {
-    mock.module(PLUGIN_SETTINGS_PATH, () => ({
-      getSettings: async () => ({}) as Record<string, string>,
-    }));
+    await removeSettings(SETTINGS_ID);
     const { default: router } = await import("../../src/server/routes/rate-limit");
     const res = await router.request(
       "http://localhost/api/rate-limit/test",
@@ -18,17 +21,13 @@ describe("routes/rate-limit", () => {
   });
 
   test("GET /api/rate-limit/test when rate limit enabled returns 200 then 429 after burst exceeded", async () => {
-    mock.module(PLUGIN_SETTINGS_PATH, () => ({
-      getSettings: async () =>
-        ({
-          rateLimitEnabled: "true",
-          rateLimitBurstWindow: "20",
-          rateLimitBurstMax: "3",
-          rateLimitLongWindow: "600",
-          rateLimitLongMax: "150",
-        }) as Record<string, string>,
-    }));
-    clearRateLimitState();
+    await setSettings(SETTINGS_ID, {
+      rateLimitEnabled: "true",
+      rateLimitBurstWindow: "20",
+      rateLimitBurstMax: "3",
+      rateLimitLongWindow: "600",
+      rateLimitLongMax: "150",
+    });
     const { default: router } = await import("../../src/server/routes/rate-limit");
     const baseUrl = "http://localhost/api/rate-limit/test";
     const req = (url: string) =>

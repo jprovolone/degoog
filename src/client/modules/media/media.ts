@@ -2,6 +2,7 @@ import { state } from "../../state";
 import { getEngines } from "../../utils/engines";
 import { buildSearchUrl, proxyImageUrl } from "../../utils/url";
 import { escapeHtml, cleanHostname } from "../../utils/dom";
+import { openLightbox } from "./lightbox";
 import type { ScoredResult } from "../../types";
 
 let mediaObserver: IntersectionObserver | null = null;
@@ -96,6 +97,14 @@ export async function loadMoreMedia(type: string): Promise<void> {
   }
 }
 
+const _getEmbedUrl = (url: string): string | null => {
+  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?/]+)/);
+  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+  const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
+  if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+  return null;
+};
+
 export function openMediaPreview(
   item: ScoredResult,
   idx: number,
@@ -110,12 +119,74 @@ export function openMediaPreview(
   currentMediaIdx = idx;
   currentCardSelector = cardSelector;
 
-  if (img) img.src = proxyImageUrl(item.thumbnail || "") || "";
+  const isVideo = cardSelector === ".video-card";
+  const previewSrc = item.imageUrl || item.thumbnail || "";
+
+  const imgWrap = document.querySelector<HTMLElement>(
+    ".media-preview-img-wrap",
+  );
+  imgWrap?.querySelector(".media-preview-embed")?.remove();
+
+  const embedUrl = isVideo ? _getEmbedUrl(item.url) : null;
+
+  if (img) {
+    if (embedUrl) {
+      img.style.display = "none";
+      img.src = "";
+      img.style.cursor = "";
+      img.onclick = null;
+      const iframe = document.createElement("iframe");
+      iframe.className = "media-preview-embed";
+      iframe.src = embedUrl;
+      iframe.setAttribute("allowfullscreen", "");
+      iframe.setAttribute("allow", "encrypted-media");
+      img.insertAdjacentElement("afterend", iframe);
+    } else {
+      img.style.display = "";
+      img.src = proxyImageUrl(previewSrc) || "";
+      if (isVideo) {
+        img.style.cursor = "";
+        img.onclick = null;
+      } else {
+        img.style.cursor = "zoom-in";
+        img.onclick = () => {
+          const src = img.src;
+          if (src) openLightbox(src);
+        };
+      }
+    }
+  }
+
   if (info) {
+    const target = state.openInNewTab ? ' target="_blank" rel="noopener"' : "";
+    const engines = item.sources?.length
+      ? `<div class="media-preview-engines">${item.sources.map((s) => `<span class="result-engine-tag">${escapeHtml(s)}</span>`).join("")}</div>`
+      : "";
+
+    let actions: string;
+    if (isVideo) {
+      actions = `<a class="btn btn--primary media-preview-visit" href="${escapeHtml(item.url)}"${target}>Watch video</a>`;
+    } else {
+      const downloadUrl = previewSrc ? proxyImageUrl(previewSrc) : "";
+      const downloadFilename = (() => {
+        try {
+          const p = new URL(previewSrc).pathname;
+          return p.split("/").filter(Boolean).pop() || "image";
+        } catch {
+          return "image";
+        }
+      })();
+      actions = `
+        <a class="btn btn--primary media-preview-visit" href="${escapeHtml(item.url)}"${target}>Visit page</a>
+        ${downloadUrl ? `<a class="btn btn--secondary media-preview-download" href="${escapeHtml(downloadUrl)}" download="${escapeHtml(downloadFilename)}">Download</a>` : ""}
+      `;
+    }
+
     info.innerHTML = `
       <h3 class="media-preview-title">${escapeHtml(item.title)}</h3>
-      <a class="media-preview-link" href="${escapeHtml(item.url)}" target="_blank">${escapeHtml(cleanHostname(item.url))}</a>
-      <a class="media-preview-visit" href="${escapeHtml(item.url)}" target="_blank">Visit page</a>
+      <a class="media-preview-link" href="${escapeHtml(item.url)}"${target}>${escapeHtml(cleanHostname(item.url))}</a>
+      ${engines}
+      <div class="media-preview-actions">${actions}</div>
     `;
   }
 
@@ -219,6 +290,11 @@ export function navigateMediaPreview(direction: -1 | 1): void {
 
 export function closeMediaPreview(): void {
   document.getElementById("media-preview-panel")?.classList.remove("open");
+  document.querySelector(".media-preview-embed")?.remove();
+  const img = document.getElementById(
+    "media-preview-img",
+  ) as HTMLImageElement | null;
+  if (img) img.style.display = "";
   document
     .querySelectorAll<HTMLElement>(".image-card, .video-card")
     .forEach((c) => c.classList.remove("selected"));

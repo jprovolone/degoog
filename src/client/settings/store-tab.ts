@@ -23,7 +23,7 @@ interface StoreItem {
   name: string;
   description?: string;
   version: string;
-  type: "plugin" | "theme" | "engine";
+  type: "plugin" | "theme" | "engine" | "transport";
   installed: boolean;
   installedVersion?: string;
   updateAvailable?: boolean;
@@ -75,6 +75,7 @@ function engineTypeLabel(t: string): string {
   if (t === "images") return "Images";
   if (t === "videos") return "Videos";
   if (t === "news") return "News";
+
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
@@ -127,7 +128,7 @@ const _renderRepoList = (
   selectedUrl: string | null,
 ): string => {
   if (!repos.length) {
-    return '<p class="store-empty">No repositories added. Add a git repository URL to browse its plugins, themes, and engines.</p>';
+    return '<p class="store-empty">No repositories added. Add a git repository URL to browse its plugins, themes, engines, and transports.</p>';
   }
   const selected = selectedUrl
     ? repos.find((r) => r.url === selectedUrl)
@@ -163,12 +164,12 @@ const _renderItemCard = (
   const token = getToken();
   const firstUrl = item.screenshots.length
     ? screenshotUrl(
-      item.repoSlug,
-      item.type,
-      itemSlug,
-      item.screenshots[0],
-      token,
-    )
+        item.repoSlug,
+        item.type,
+        itemSlug,
+        item.screenshots[0],
+        token,
+      )
     : "";
   const thumb = item.screenshots.length
     ? `<img src="${firstUrl}" alt="" class="store-card-thumb" loading="lazy">`
@@ -188,18 +189,21 @@ const _renderItemCard = (
       ? `<a href="${escapeHtml(item.author.url)}" target="_blank" rel="noopener">${escapeHtml(item.author.name)}</a>`
       : escapeHtml(item.author.name)
     : "";
-  const typeLabel =
-    item.type === "plugin"
-      ? "Plugin"
-      : item.type === "theme"
-        ? "Theme"
-        : "Engine";
-  const subLabel =
-    item.type === "plugin" && item.pluginType
-      ? pluginTypeLabel(item.pluginType)
-      : item.type === "engine" && item.engineType
-        ? engineTypeLabel(item.engineType)
-        : "";
+
+  let typeLabel = "";
+  let subLabel = "";
+  if (item.type === "plugin") {
+    typeLabel = "Plugin";
+    subLabel = item.pluginType ? pluginTypeLabel(item.pluginType) : "";
+  } else if (item.type === "engine") {
+    typeLabel = "Engine";
+    subLabel = item.engineType ? engineTypeLabel(item.engineType) : "";
+  } else if (item.type === "transport") {
+    typeLabel = "Transport";
+  } else {
+    typeLabel = "Theme";
+  }
+
   const btn = item.installed
     ? item.updateAvailable
       ? `<span class="ext-configured-badge"></span><button class="btn btn--primary store-btn-update" type="button" data-repo-url="${escapeHtml(item.repoUrl)}" data-item-path="${escapeHtml(item.path)}" data-type="${escapeHtml(item.type)}">Update</button><button class="btn btn--secondary store-btn-uninstall" type="button" data-repo-url="${escapeHtml(item.repoUrl)}" data-item-path="${escapeHtml(item.path)}" data-type="${escapeHtml(item.type)}">Uninstall</button>`
@@ -335,101 +339,93 @@ export async function initStoreTab(
       ".store-repo-list-wrap",
     );
     if (listEl) {
-      listEl.innerHTML = _renderRepoList(repos, getToken, repoStatusByUrl, selectedRepoUrl);
-      listEl
-        .querySelectorAll<HTMLElement>(".store-repo-item")
-        .forEach((el) => {
-          el.addEventListener("click", () => {
-            const url = el.dataset.url;
-            if (!url) return;
-            selectedRepoUrl = selectedRepoUrl === url ? null : url;
-            render();
-          });
+      listEl.innerHTML = _renderRepoList(
+        repos,
+        getToken,
+        repoStatusByUrl,
+        selectedRepoUrl,
+      );
+      listEl.querySelectorAll<HTMLElement>(".store-repo-item").forEach((el) => {
+        el.addEventListener("click", () => {
+          const url = el.dataset.url;
+          if (!url) return;
+          selectedRepoUrl = selectedRepoUrl === url ? null : url;
+          render();
         });
+      });
     }
 
     const catalogSection = container.querySelector<HTMLElement>(
       ".store-catalog-section",
     );
-    const typeTabs =
-      catalogSection?.querySelector<HTMLElement>(".store-type-tabs");
-    const subtypeWrap = catalogSection?.querySelector<HTMLElement>(
-      ".store-subtype-wrap",
-    );
-    const subtypeTabs = catalogSection?.querySelector<HTMLElement>(
-      ".store-subtype-tabs",
+    const typeSelect =
+      catalogSection?.querySelector<HTMLSelectElement>(".store-filter-type");
+    const subtypeSelect = catalogSection?.querySelector<HTMLSelectElement>(
+      ".store-filter-subtype",
     );
     const grid = catalogSection?.querySelector<HTMLElement>(
       ".store-catalog-grid",
     );
 
-    if (typeTabs) {
+    if (typeSelect) {
       const typeCounts = {
         all: items.length,
         plugin: items.filter((i) => i.type === "plugin").length,
         theme: items.filter((i) => i.type === "theme").length,
         engine: items.filter((i) => i.type === "engine").length,
+        transport: items.filter((i) => i.type === "transport").length,
       };
-      typeTabs.innerHTML = [
+      typeSelect.innerHTML = [
         { id: "all", label: "All", count: typeCounts.all },
         { id: "plugin", label: "Plugins", count: typeCounts.plugin },
         { id: "theme", label: "Themes", count: typeCounts.theme },
         { id: "engine", label: "Engines", count: typeCounts.engine },
+        { id: "transport", label: "Transports", count: typeCounts.transport },
       ]
         .map(
           (t) =>
-            `<button class="btn store-type-tab ${typeFilter === t.id ? "active" : ""}" type="button" data-type="${escapeHtml(t.id)}">${escapeHtml(t.label)} <span class="store-tab-count">${t.count}</span></button>`,
+            `<option value="${escapeHtml(t.id)}" ${typeFilter === t.id ? "selected" : ""}>${escapeHtml(t.label)} (${t.count})</option>`,
         )
         .join("");
-      typeTabs
-        .querySelectorAll<HTMLButtonElement>(".store-type-tab")
-        .forEach((btn) => {
-          btn.addEventListener("click", () => {
-            typeFilter = btn.dataset.type || "all";
-            subtypeFilter = "all";
-            render();
-          });
-        });
+      typeSelect.onchange = () => {
+        typeFilter = typeSelect.value;
+        subtypeFilter = "all";
+        render();
+      };
     }
 
     const subtypes = collectSubtypes(items, typeFilter);
-    if (subtypeWrap) {
+    if (subtypeSelect) {
       if (subtypes.length === 0) {
-        subtypeWrap.classList.add("store-subtype-wrap--hidden");
-        if (subtypeTabs) subtypeTabs.innerHTML = "";
+        subtypeSelect.style.display = "none";
+        subtypeSelect.innerHTML = "";
       } else {
-        subtypeWrap.classList.remove("store-subtype-wrap--hidden");
-        if (subtypeTabs) {
-          const filteredForType = items.filter((i) => i.type === typeFilter);
-          subtypeTabs.innerHTML = [
-            { id: "all", label: "All", count: filteredForType.length },
-            ...subtypes.map((id) => ({
-              id,
-              label:
-                typeFilter === "plugin"
-                  ? pluginTypeLabel(id)
-                  : engineTypeLabel(id),
-              count: filteredForType.filter(
-                (i) =>
-                  (typeFilter === "plugin" && i.pluginType === id) ||
-                  (typeFilter === "engine" && i.engineType === id),
-              ).length,
-            })),
-          ]
-            .map(
-              (t) =>
-                `<button class="btn store-subtype-tab ${subtypeFilter === t.id ? "active" : ""}" type="button" data-subtype="${escapeHtml(t.id)}">${escapeHtml(t.label)} <span class="store-tab-count">${t.count}</span></button>`,
-            )
-            .join("");
-          subtypeTabs
-            .querySelectorAll<HTMLButtonElement>(".store-subtype-tab")
-            .forEach((btn) => {
-              btn.addEventListener("click", () => {
-                subtypeFilter = btn.dataset.subtype || "all";
-                render();
-              });
-            });
-        }
+        subtypeSelect.style.display = "";
+        const filteredForType = items.filter((i) => i.type === typeFilter);
+        subtypeSelect.innerHTML = [
+          { id: "all", label: "All", count: filteredForType.length },
+          ...subtypes.map((id) => ({
+            id,
+            label:
+              typeFilter === "plugin"
+                ? pluginTypeLabel(id)
+                : engineTypeLabel(id),
+            count: filteredForType.filter(
+              (i) =>
+                (typeFilter === "plugin" && i.pluginType === id) ||
+                (typeFilter === "engine" && i.engineType === id),
+            ).length,
+          })),
+        ]
+          .map(
+            (t) =>
+              `<option value="${escapeHtml(t.id)}" ${subtypeFilter === t.id ? "selected" : ""}>${escapeHtml(t.label)} (${t.count})</option>`,
+          )
+          .join("");
+        subtypeSelect.onchange = () => {
+          subtypeFilter = subtypeSelect.value;
+          render();
+        };
       }
     }
 
@@ -646,7 +642,7 @@ export async function initStoreTab(
         <button class="btn btn--primary store-btn-add-confirm" type="button">Add</button>
         <span class="store-inline-error"></span>
       </div>
-      <p class="settings-desc">Add a git repository URL to browse and install plugins, themes, and engines. Set <code>repo-image</code> in the repo’s package.json to show an image next to the URL.</p>
+      <p class="settings-desc">Add a git repository URL to browse and install plugins, themes, engines, and transports. Set <code>repo-image</code> in the repo’s package.json to show an image next to the URL.</p>
       <div class="store-repo-list-wrap"></div>
     </section>
     <section class="store-catalog-section settings-section">
@@ -654,12 +650,10 @@ export async function initStoreTab(
         <h2 class="settings-section-heading">Catalog</h2>
         <button class="btn btn--primary store-btn-update-all" type="button" style="display:none">Update all</button>
       </div>
-      <div class="store-catalog-search-wrap">
-        <input type="text" class="store-search-input" placeholder="Search name, description, repo, author…" id="store-search-input">
-      </div>
-      <div class="store-type-tabs" role="tablist"></div>
-      <div class="store-subtype-wrap store-subtype-wrap--hidden">
-        <div class="store-subtype-tabs" role="tablist"></div>
+      <div class="store-filter-bar">
+        <input type="text" class="store-search-input" placeholder="Search…" id="store-search-input">
+        <select class="store-filter-select store-filter-type" aria-label="Filter by type"></select>
+        <select class="store-filter-select store-filter-subtype" aria-label="Filter by sub-type" style="display:none"></select>
       </div>
       <div class="store-catalog-grid"></div>
     </section>
@@ -753,7 +747,7 @@ export async function initStoreTab(
         method: "POST",
         headers: jsonHeaders(getToken),
         body: JSON.stringify({}),
-      }).catch(() => { });
+      }).catch(() => {});
       await loadRepos();
       await loadItems();
       await loadReposStatus();

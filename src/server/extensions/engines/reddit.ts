@@ -3,12 +3,40 @@ import type {
   SearchResult,
   TimeFilter,
   EngineContext,
+  SettingField,
 } from "../../types";
 import { getRandomUserAgent } from "../../utils/user-agents";
 
 export class RedditEngine implements SearchEngine {
   name = "Reddit";
   bangShortcut = "r";
+  includeNsfw: string = "false";
+  sortBy: string = "hot";
+  settingsSchema: SettingField[] = [
+    {
+      key: "includeNsfw",
+      label: "Include NSFW",
+      type: "toggle",
+      description: "Show NSFW posts in search results.",
+    },
+    {
+      key: "sortBy",
+      label: "Sort By",
+      type: "select",
+      options: ["hot", "relevance", "new", "top"],
+      description: "How to sort Reddit search results.",
+      default: "hot",
+    },
+  ];
+
+  configure(settings: Record<string, string | string[]>): void {
+    if (typeof settings.includeNsfw === "string") {
+      this.includeNsfw = settings.includeNsfw;
+    }
+    if (typeof settings.sortBy === "string") {
+      this.sortBy = settings.sortBy;
+    }
+  }
 
   async executeSearch(
     query: string,
@@ -21,9 +49,10 @@ export class RedditEngine implements SearchEngine {
     const params = new URLSearchParams({
       q: query,
       type: "link",
-      sort: "relevance",
+      sort: this.sortBy,
       t,
       limit: String(limit),
+      include_over_18: this.includeNsfw === "true" ? "1" : "0",
     });
     if (page > 1) {
       params.set("count", String((page - 1) * limit));
@@ -35,7 +64,10 @@ export class RedditEngine implements SearchEngine {
       headers: {
         "User-Agent": getRandomUserAgent(),
         Accept: "application/json, text/plain, */*",
-        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Language":
+          context?.buildAcceptLanguage?.() ||
+          process.env.DEGOOG_DEFAULT_SEARCH_LANGUAGE ||
+          "en-US,en;q=0.9",
         "Accept-Encoding": "gzip, deflate, br",
         "Sec-Fetch-Dest": "empty",
         "Sec-Fetch-Mode": "cors",

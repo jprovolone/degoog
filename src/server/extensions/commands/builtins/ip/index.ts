@@ -3,6 +3,7 @@ import type {
   CommandResult,
   CommandContext,
 } from "../../../../types";
+import { outgoingFetch } from "../../../../utils/outgoing";
 
 export const ipCommand: BangCommand = {
   name: "IP Lookup",
@@ -29,7 +30,7 @@ export const ipCommand: BangCommand = {
       };
     }
     try {
-      const res = await fetch(
+      const res = await outgoingFetch(
         `http://ip-api.com/json/${encodeURIComponent(ip)}`,
       );
       const data = await res.json();

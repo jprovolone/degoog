@@ -1,16 +1,13 @@
-import { SlotPanelPosition, type SettingField, type SlotPlugin } from "../../../../types";
+import {
+  SlotPanelPosition,
+  type SettingField,
+  type SlotPlugin,
+} from "../../../../types";
 import { getSettings, asString } from "../../../../utils/plugin-settings";
 
 export const AI_SUMMARY_ID = "ai-summary";
 
 export const aiSummarySettingsSchema: SettingField[] = [
-  {
-    key: "enabled",
-    label: "Enable AI Summary",
-    type: "toggle",
-    description:
-      "Replace At a Glance with a brief AI-generated summary of search results",
-  },
   {
     key: "baseUrl",
     label: "API Base URL",

@@ -1,15 +1,23 @@
 import { performSearch } from "../utils/search-actions";
 import { performTabSearch } from "./tabs/tab-search";
-import { showHome } from "../utils/navigation";
+import { recordSettingsReturn, showHome } from "../utils/navigation";
 import { initAutocomplete } from "../utils/autocomplete";
 import { initLuckyAnimation } from "../animations/lucky-animation";
 import { initTabs } from "./tabs/tabs";
 import { initMediaPreview } from "./media/media-preview";
 import { initTheme } from "../utils/theme";
-import { initTimeFilter } from "../utils/time-filter";
+import { initOptionsDropdown } from "../utils/time-filter";
+import { idbGet } from "../utils/db";
+import {
+  OPEN_IN_NEW_TAB_KEY,
+  DISPLAY_ENGINE_PERFORMANCE,
+  DISPLAY_SEARCH_SUGGESTIONS,
+} from "../constants";
+import { state } from "../state";
 
 import { initInstallPrompt } from "../utils/install-prompt";
 import { initSearchBarActions } from "../utils/search-bar-actions";
+import { renderPageTemplates } from "./renderer/render-page";
 
 function _copyToClipboard(text: string, onSuccess: () => void): void {
   const el = document.createElement("textarea");
@@ -28,6 +36,29 @@ function _copyToClipboard(text: string, onSuccess: () => void): void {
 }
 
 export function init(): void {
+  renderPageTemplates();
+
+  document.body.addEventListener(
+    "click",
+    (e) => {
+      if (e.defaultPrevented) return;
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)
+        return;
+      const a = (e.target as HTMLElement).closest<HTMLAnchorElement>("a[href]");
+      if (!a) return;
+      let url: URL;
+      try {
+        url = new URL(a.href);
+      } catch {
+        return;
+      }
+      if (url.origin !== location.origin) return;
+      if (!url.pathname.startsWith("/settings")) return;
+      recordSettingsReturn();
+    },
+    true,
+  );
+
   const searchInput = document.getElementById(
     "search-input",
   ) as HTMLInputElement | null;
@@ -70,8 +101,18 @@ export function init(): void {
   initTabs();
   initMediaPreview();
   void initTheme();
-  initTimeFilter();
+  initOptionsDropdown();
   initInstallPrompt();
+
+  void idbGet<boolean>(OPEN_IN_NEW_TAB_KEY).then((v) => {
+    if (v !== null) state.openInNewTab = v;
+  });
+  void idbGet<boolean>(DISPLAY_ENGINE_PERFORMANCE).then((v) => {
+    if (v !== null) state.displayEnginePerformance = v;
+  });
+  void idbGet<boolean>(DISPLAY_SEARCH_SUGGESTIONS).then((v) => {
+    if (v !== null) state.displaySearchSuggestions = v;
+  });
 
   document.body.addEventListener("click", (e) => {
     const btn = (e.target as HTMLElement).closest<HTMLElement>(".uuid-copy");
@@ -99,7 +140,7 @@ export function init(): void {
 
   const params = new URLSearchParams(window.location.search);
   const q = params.get("q");
-  const type = params.get("type") || "all";
+  const type = params.get("type") || "web";
   const page = parseInt(params.get("page") ?? "1", 10) || 1;
   if (q) {
     if (searchInput) searchInput.value = q;

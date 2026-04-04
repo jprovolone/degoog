@@ -8,16 +8,40 @@ import type {
   EngineTiming,
   KnowledgePanel,
   TimeFilter,
+  EngineContext,
 } from "./types";
 import {
   getEngineMap,
   getActiveWebEngines,
   getEnginesForSearchType,
+  getEngineIdByInstance,
+  getEngineDefaultTransport,
 } from "./extensions/engines/registry";
-import { outgoingFetch } from "./utils/outgoing";
+import { getSettings, asString } from "./utils/plugin-settings";
+import { outgoingFetch, parseOutgoingTransport } from "./utils/outgoing";
+import { resolveTransport } from "./extensions/transports/registry";
 
 const MAX_PAGE = 10;
 const ENGINE_TIMEOUT_MS = 10_000;
+
+const ENGINE_TIMEOUT_BUFFER_MS = 5000;
+
+const _getEngineTimeout = async (
+  engineSettingsId: string | undefined,
+): Promise<number> => {
+  if (!engineSettingsId) return ENGINE_TIMEOUT_MS;
+  let raw =
+    asString((await getSettings(engineSettingsId)).outgoingTransport) ||
+    undefined;
+  if (!raw)
+    raw = getEngineDefaultTransport(engineSettingsId) ?? undefined;
+  const transportName = parseOutgoingTransport(raw);
+  const transport = resolveTransport(transportName);
+  if (transport.timeoutMs && transport.timeoutMs > ENGINE_TIMEOUT_MS) {
+    return transport.timeoutMs + ENGINE_TIMEOUT_BUFFER_MS;
+  }
+  return ENGINE_TIMEOUT_MS;
+};
 
 const _normalizeUrl = (url: string): string => {
   try {
@@ -35,11 +59,12 @@ const _normalizeUrl = (url: string): string => {
 const _mergeIntoMap = (
   urlMap: Map<string, ScoredResult>,
   results: SearchResult[],
+  multiplier = 1,
 ): void => {
   for (let i = 0; i < results.length; i++) {
     const r = results[i];
     const normalized = _normalizeUrl(r.url);
-    const positionScore = Math.max(10 - i, 1);
+    const positionScore = Math.max(10 - i, 1) * multiplier;
 
     if (urlMap.has(normalized)) {
       const existing = urlMap.get(normalized)!;
@@ -70,7 +95,9 @@ const _sortedFromMap = (urlMap: Map<string, ScoredResult>): ScoredResult[] => {
   return scored;
 };
 
-const _fetchRelatedSearches = async (query: string): Promise<string[]> => {
+export const fetchRelatedSearches = async (
+  query: string,
+): Promise<string[]> => {
   try {
     const res = await outgoingFetch(
       `https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(query)}`,
@@ -88,7 +115,7 @@ const _fetchRelatedSearches = async (query: string): Promise<string[]> => {
   }
 };
 
-const _fetchKnowledgePanel = async (
+export const fetchKnowledgePanel = async (
   query: string,
 ): Promise<KnowledgePanel | null> => {
   try {
@@ -154,12 +181,12 @@ const _withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
   ]);
 };
 
-export const aggregateAndScore = (
-  allResults: SearchResult[][],
+export const scoreResults = (
+  allResults: { results: SearchResult[]; multiplier?: number }[],
 ): ScoredResult[] => {
   const urlMap = new Map<string, ScoredResult>();
-  for (const engineResults of allResults) {
-    _mergeIntoMap(urlMap, engineResults);
+  for (const { results, multiplier } of allResults) {
+    _mergeIntoMap(urlMap, results, multiplier ?? 1);
   }
   return _sortedFromMap(urlMap);
 };
@@ -185,11 +212,44 @@ export const resolveEngine = (engineName: string): SearchEngine | null => {
   return null;
 };
 
+const _buildAcceptLanguage = (lang?: string): string => {
+  if (!lang || lang === "en") return "en-US,en;q=0.9";
+  return `${lang},${lang}-${lang.toUpperCase()};q=0.9,en;q=0.8`;
+};
+
+export const createSearchEngineContext = (
+  engineSettingsId: string | undefined,
+  lang?: string,
+  dateFrom?: string,
+  dateTo?: string,
+): EngineContext => ({
+  fetch: async (url, init) => {
+    let raw: string | undefined;
+    if (engineSettingsId !== undefined) {
+      raw =
+        asString((await getSettings(engineSettingsId)).outgoingTransport) ||
+        undefined;
+    }
+    if (!raw && engineSettingsId !== undefined) {
+      raw = getEngineDefaultTransport(engineSettingsId) ?? undefined;
+    }
+    const transport = parseOutgoingTransport(raw);
+    return outgoingFetch(url, init ?? {}, transport);
+  },
+  lang: lang || undefined,
+  dateFrom: dateFrom || undefined,
+  dateTo: dateTo || undefined,
+  buildAcceptLanguage: () => _buildAcceptLanguage(lang),
+});
+
 export const searchSingleEngine = async (
   engineName: string,
   query: string,
   page: number = 1,
   timeFilter: TimeFilter = "any",
+  lang?: string,
+  dateFrom?: string,
+  dateTo?: string,
 ): Promise<{ results: SearchResult[]; timing: EngineTiming }> => {
   const engine = resolveEngine(engineName);
   if (!engine) {
@@ -200,11 +260,18 @@ export const searchSingleEngine = async (
   }
   const p = Math.max(1, Math.min(MAX_PAGE, Math.floor(page) || 1));
   const t0 = performance.now();
-  const engineContext = { fetch: outgoingFetch };
+  const engineSettingsId = getEngineIdByInstance(engine);
+  const engineContext = createSearchEngineContext(
+    engineSettingsId,
+    lang,
+    dateFrom,
+    dateTo,
+  );
   try {
+    const timeout = await _getEngineTimeout(engineSettingsId);
     const results = await _withTimeout(
       engine.executeSearch(query, p, timeFilter, engineContext),
-      ENGINE_TIMEOUT_MS,
+      timeout,
     );
     const elapsed = Math.round(performance.now() - t0);
     return {
@@ -223,19 +290,26 @@ export const searchSingleEngine = async (
 export const search = async (
   query: string,
   config: EngineConfig,
-  type: SearchType = "all",
+  type: SearchType = "web",
   page: number = 1,
   timeFilter: TimeFilter = "any",
+  lang?: string,
+  dateFrom?: string,
+  dateTo?: string,
 ): Promise<SearchResponse> => {
   const start = performance.now();
   const p = Math.max(1, Math.min(MAX_PAGE, Math.floor(page) || 1));
 
-  const activeEngines =
-    type === "all"
+  const rawActiveEngines =
+    type === "web"
       ? await getActiveWebEngines(config)
-      : getEnginesForSearchType(type, config);
+      : getEnginesForSearchType(type, config).map((e) => ({
+          id: e.id,
+          instance: e.instance,
+          score: 1,
+        }));
 
-  if (activeEngines.length === 0) {
+  if (rawActiveEngines.length === 0) {
     return {
       results: [],
       atAGlance: null,
@@ -248,55 +322,56 @@ export const search = async (
     };
   }
 
-  const engineStarts = activeEngines.map(() => performance.now());
-
-  const engineContext = { fetch: outgoingFetch };
   const settled = await Promise.allSettled(
-    activeEngines.map(async (engine, i) => {
-      engineStarts[i] = performance.now();
+    rawActiveEngines.map(async ({ instance, id }) => {
+      const t0 = performance.now();
+      const ctx = createSearchEngineContext(id, lang, dateFrom, dateTo);
+      const timeout = await _getEngineTimeout(id);
       const results = await _withTimeout(
-        engine.executeSearch(query, p, timeFilter, engineContext),
-        ENGINE_TIMEOUT_MS,
+        instance.executeSearch(query, p, timeFilter, ctx),
+        timeout,
       );
-      return results;
+      return { results, elapsed: Math.round(performance.now() - t0) };
     }),
   );
 
-  const allResults: SearchResult[][] = [];
+  const allResults: { results: SearchResult[]; multiplier: number }[] = [];
   const engineTimings: EngineTiming[] = [];
 
   for (let i = 0; i < settled.length; i++) {
     const result = settled[i];
-    const elapsed = Math.round(performance.now() - engineStarts[i]);
     if (result.status === "fulfilled") {
-      allResults.push(result.value);
+      allResults.push({
+        results: result.value.results,
+        multiplier: rawActiveEngines[i].score,
+      });
       engineTimings.push({
-        name: activeEngines[i].name,
-        time: elapsed,
-        resultCount: result.value.length,
+        name: rawActiveEngines[i].instance.name,
+        time: result.value.elapsed,
+        resultCount: result.value.results.length,
       });
     } else {
       engineTimings.push({
-        name: activeEngines[i].name,
-        time: elapsed,
+        name: rawActiveEngines[i].instance.name,
+        time: ENGINE_TIMEOUT_MS,
         resultCount: 0,
       });
     }
   }
 
-  const scored = aggregateAndScore(allResults);
+  const scored = scoreResults(allResults);
   const atAGlance =
-    type === "all" && scored.length > 0 && scored[0].snippet ? scored[0] : null;
+    type === "web" && scored.length > 0 && scored[0].snippet ? scored[0] : null;
 
   let relatedSearches: string[] = [];
   let knowledgePanel: KnowledgePanel | null = null;
 
-  if (type === "all" && p === 1) {
+  if (type === "web" && p === 1) {
     [relatedSearches, knowledgePanel] = await Promise.all([
-      _withTimeout(_fetchRelatedSearches(query), ENGINE_TIMEOUT_MS).catch(
+      _withTimeout(fetchRelatedSearches(query), ENGINE_TIMEOUT_MS).catch(
         () => [],
       ),
-      _withTimeout(_fetchKnowledgePanel(query), ENGINE_TIMEOUT_MS).catch(
+      _withTimeout(fetchKnowledgePanel(query), ENGINE_TIMEOUT_MS).catch(
         () => null,
       ),
     ]);

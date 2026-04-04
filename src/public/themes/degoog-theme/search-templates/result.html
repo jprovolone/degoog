@@ -1,0 +1,42 @@
+<div class="result-item">
+  <div class="result-item-inner">
+    {{#if thumbnail_url}}
+    <div class="result-thumbnail-wrap">
+      <img
+        class="result-thumbnail-img"
+        src="{{ thumbnail_url }}"
+        alt=""
+        loading="lazy"
+        onerror="this.parentElement.style.display = 'none'"
+      />
+    </div>
+    {{/if thumbnail_url}}
+
+    <div class="result-body">
+      <div class="result-url-row">
+        <img
+          class="result-favicon"
+          src="{{ favicon_url }}"
+          alt=""
+          width="26"
+          height="26"
+          onerror="this.style.display = 'none'"
+        />
+        <cite class="result-cite">{{ cite_url }}</cite>
+      </div>
+      <a
+        class="result-title"
+        href="{{ url }}"
+        target="{{ link_target }}"
+        rel="{{ link_rel }}"
+        >{{ title }}</a
+      >
+      <p class="result-snippet">{{ snippet }}</p>
+      <div class="result-engines">
+        {{#each sources}}
+        <span class="result-engine-tag">{{ . }}</span>
+        {{/each sources}}
+      </div>
+    </div>
+  </div>
+</div>
