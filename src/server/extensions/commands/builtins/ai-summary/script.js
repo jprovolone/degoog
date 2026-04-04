@@ -62,6 +62,8 @@
     const query = getQuery();
     const context = buildResultsContext();
 
+    const snippetText = snippet ? snippet.textContent || "" : "";
+
     history = [
       {
         role: "system",
@@ -74,9 +76,13 @@
       },
       {
         role: "assistant",
-        content: snippet ? snippet.textContent || "" : "",
+        content: snippetText,
       },
     ];
+
+    if (snippet && snippetText) {
+      snippet.innerHTML = _renderMarkdown(snippetText);
+    }
 
     diveBtn.addEventListener("click", function () {
       diveBtn.hidden = true;
