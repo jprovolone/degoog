@@ -1,15 +1,18 @@
-import { readdir, readFile, mkdir } from "fs/promises";
+import { mkdir, readdir, readFile } from "fs/promises";
 import { join } from "path";
-import * as sass from "sass";
 import {
-  getSettings,
-  setSettings,
-  maskSecrets,
+  type ExtensionMeta,
+  ExtensionStoreType,
+  type SettingField,
+  Translate,
+} from "../../types";
+import { logger } from "../../utils/logger";
+import {
   asString,
+  getSettings,
+  maskSecrets,
+  setSettings,
 } from "../../utils/plugin-settings";
-import { debug } from "../../utils/logger";
-import { type SettingField, type ExtensionMeta, ExtensionStoreType } from "../../types";
-
 
 const THEME_SETTINGS_ID = "theme";
 
@@ -36,9 +39,11 @@ export interface LoadedTheme {
   manifest: ThemeManifest;
   dir: string;
   compiledCss?: string;
+  t?: Translate;
 }
 
 import { themesDir } from "../../utils/paths";
+import { createTranslatorFromPath } from "../../utils/translation";
 
 const THEMES_DIR = themesDir();
 
@@ -57,13 +62,9 @@ async function compileThemeCss(
 
   const fullPath = join(theme.dir, cssFile);
   try {
-    if (cssFile.endsWith(".scss")) {
-      const result = sass.compile(fullPath);
-      return result.css;
-    }
     return await readFile(fullPath, "utf-8");
   } catch (err) {
-    debug("themes", `Failed to compile CSS for theme ${theme.id}`, err);
+    logger.debug("themes", `Failed to compile CSS for theme ${theme.id}`, err);
     return undefined;
   }
 }
@@ -87,6 +88,7 @@ export async function initThemes(): Promise<void> {
 
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
+
       const themeDir = join(THEMES_DIR, entry.name);
       const manifestPath = join(themeDir, "theme.json");
 
@@ -95,7 +97,10 @@ export async function initThemes(): Promise<void> {
         const manifest: ThemeManifest = JSON.parse(raw);
 
         if (!manifest.name) {
-          debug("themes", `Theme ${entry.name} missing name in theme.json`);
+          logger.debug(
+            "themes",
+            `Theme ${entry.name} missing name in theme.json`,
+          );
           continue;
         }
 
@@ -107,6 +112,8 @@ export async function initThemes(): Promise<void> {
 
         theme.compiledCss = await compileThemeCss(theme);
 
+        theme.t = await createTranslatorFromPath(themeDir);
+
         if (manifest.settingsSchema?.length) {
           const stored = await getSettings(settingsId(entry.name));
           if (Object.keys(stored).length > 0) {
@@ -115,11 +122,11 @@ export async function initThemes(): Promise<void> {
 
         themes.push(theme);
       } catch (err) {
-        debug("themes", `Failed to load theme: ${entry.name}`, err);
+        logger.debug("themes", `Failed to load theme: ${entry.name}`, err);
       }
     }
   } catch (err) {
-    debug("themes", "Failed to read themes directory", err);
+    logger.debug("themes", "Failed to read themes directory", err);
   }
 
   activeThemeId = await loadActiveThemeId();
@@ -232,7 +239,10 @@ export async function getThemeTemplatesHtml(): Promise<string> {
       const content = await readFile(join(theme.dir, filePath), "utf-8");
       parts.push(`<template id="degoog-${id}">${content}</template>`);
     } catch {
-      debug("themes", `Failed to read template file: ${filePath} for theme ${theme.id}`);
+      logger.debug(
+        "themes",
+        `Failed to read template file: ${filePath} for theme ${theme.id}`,
+      );
     }
   }
   return parts.join("\n");

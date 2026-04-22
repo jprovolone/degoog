@@ -1,16 +1,20 @@
 import { join } from "path";
-import { SlotPanelPosition, type SlotPlugin } from "../../types";
 import {
-  isDisabled,
-} from "../../utils/plugin-settings";
+  SlotPanelPosition,
+  type SlotPlugin,
+  type Translate,
+} from "../../types";
+import { pluginsDir } from "../../utils/paths";
 import {
-  loadPluginAssets,
   initPlugin,
+  loadPluginAssets,
+  registerPluginNamespace,
   registerPluginSettingsId,
 } from "../../utils/plugin-assets";
-import { debug } from "../../utils/logger";
+import { isDisabled } from "../../utils/plugin-settings";
+import { createTranslatorFromPath } from "../../utils/translation";
+import { createRegistry } from "../registry-factory";
 
-let slotPlugins: SlotPlugin[] = [];
 const builtinsDir = join(
   process.cwd(),
   "src",
@@ -25,7 +29,8 @@ function isSlotPlugin(val: unknown): val is SlotPlugin {
   const slot = val as SlotPlugin;
   const validPositions = new Set(Object.values(SlotPanelPosition));
   const positionOk =
-    "position" in slot && validPositions.has(slot.position as SlotPanelPosition);
+    "position" in slot &&
+    validPositions.has(slot.position as SlotPanelPosition);
   const slotPositionsOk =
     !("slotPositions" in slot) ||
     (Array.isArray(slot.slotPositions) &&
@@ -45,71 +50,67 @@ function isSlotPlugin(val: unknown): val is SlotPlugin {
   );
 }
 
-async function loadSlotsFromRoot(
-  rootDir: string,
-  source: "plugin" | "builtin",
-): Promise<void> {
-  const { readdir, stat } = await import("fs/promises");
-  const { pathToFileURL } = await import("url");
-  let entries: string[];
-  try {
-    entries = await readdir(rootDir);
-  } catch {
-    return;
-  }
-  for (const entry of entries) {
-    const entryPath = join(rootDir, entry);
-    const entryStat = await stat(entryPath).catch(() => null);
-    if (!entryStat?.isDirectory()) continue;
+const slotSourceMap = new Map<string, "builtin" | "plugin">();
 
-    let indexFile: string | undefined;
-    for (const f of ["index.js", "index.ts", "index.mjs", "index.cjs"]) {
-      const s = await stat(join(entryPath, f)).catch(() => null);
-      if (s?.isFile()) {
-        indexFile = f;
-        break;
-      }
+const registry = createRegistry<SlotPlugin>({
+  dirs: () => [
+    { dir: builtinsDir, source: "builtin" },
+    { dir: pluginsDir(), source: "plugin" },
+  ],
+  match: (mod) => {
+    const s =
+      mod.slot ??
+      mod.slotPlugin ??
+      (mod.default as Record<string, unknown>)?.slot;
+    return isSlotPlugin(s) ? s : null;
+  },
+  onLoad: async (slot, { entryPath, folderName, source }) => {
+    const settingsId = slot.settingsId ?? `slot-${slot.id}`;
+    slotSourceMap.set(slot.id, source);
+    slot.t = await createTranslatorFromPath(entryPath);
+    registerPluginNamespace(folderName, `slots/${slot.id}`);
+    registerPluginSettingsId(folderName, settingsId);
+    if (!(await isDisabled(settingsId))) {
+      const template = await loadPluginAssets(
+        entryPath,
+        folderName,
+        settingsId,
+        source,
+      );
+      await initPlugin(slot, entryPath, settingsId, template);
     }
-    if (!indexFile) continue;
-
-    try {
-      const fullPath = join(entryPath, indexFile);
-      const url = pathToFileURL(fullPath).href;
-      const mod = await import(url);
-      const slot = mod.slot ?? mod.slotPlugin ?? mod.default?.slot;
-      if (!slot || !isSlotPlugin(slot)) continue;
-
-      const slotSettingsId = slot.settingsId ?? `slot-${slot.id}`;
-      registerPluginSettingsId(entry, slotSettingsId);
-
-      if (!(await isDisabled(slotSettingsId))) {
-        const template = await loadPluginAssets(entryPath, entry, slotSettingsId, source);
-        await initPlugin(slot, entryPath, slotSettingsId, template);
-      }
-      slotPlugins.push(slot);
-    } catch (err) {
-      debug("slots", `Failed to load slot plugin: ${entry}`, err);
-    }
-  }
-}
+  },
+  debugTag: "slots",
+});
 
 export async function initSlotPlugins(): Promise<void> {
-  const { pluginsDir } = await import("../../utils/paths");
-  const pluginDir = pluginsDir();
-  slotPlugins = [];
-  await loadSlotsFromRoot(builtinsDir, "builtin");
-  await loadSlotsFromRoot(pluginDir, "plugin");
+  slotSourceMap.clear();
+  await registry.init();
+}
+
+export function getSlotSource(slotId: string): "builtin" | "plugin" {
+  return slotSourceMap.get(slotId) ?? "plugin";
 }
 
 export function getSlotPlugins(): SlotPlugin[] {
-  return [...slotPlugins];
+  return registry.items();
 }
 
 export function getSlotPluginById(slotId: string): SlotPlugin | null {
-  return slotPlugins.find((p) => p.id === slotId) ?? null;
+  return registry.items().find((p) => p.id === slotId) ?? null;
+}
+
+export function getAllSlotTranslators(): {
+  namespace: string;
+  translator: Translate;
+}[] {
+  return registry
+    .items()
+    .filter((s) => !!s.t)
+    .map((s) => ({ namespace: `slots/${s.id}`, translator: s.t! }));
 }
 
 export async function reloadSlotPlugins(): Promise<void> {
-  slotPlugins = [];
-  await initSlotPlugins();
+  slotSourceMap.clear();
+  await registry.reload();
 }

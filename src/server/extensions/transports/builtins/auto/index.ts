@@ -1,11 +1,11 @@
-import { FetchTransport } from "../fetch";
-import { CurlTransport } from "../curl";
-import { debug } from "../../../../utils/logger";
 import type {
   Transport,
-  TransportFetchOptions,
   TransportContext,
-} from "../../types";
+  TransportFetchOptions,
+} from "../../../../types";
+import { logger } from "../../../../utils/logger";
+import { CurlTransport } from "../curl";
+import { FetchTransport } from "../fetch";
 
 const _fetchTransport = new FetchTransport();
 const _curlTransport = new CurlTransport();
@@ -32,7 +32,7 @@ export class AutoTransport implements Transport {
     const first = await _fetchTransport.fetch(url, options, context);
 
     if (_shouldRetryWithCurl(first.status)) {
-      debug("outgoing", `curl fallback retry ${new URL(url).hostname}`);
+      logger.debug("outgoing", `curl fallback retry ${new URL(url).hostname}`);
       return _curlTransport.fetch(url, options, context);
     }
 

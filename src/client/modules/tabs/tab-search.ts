@@ -1,18 +1,26 @@
+import { skeletonResults } from "../../animations/skeleton";
 import { state } from "../../state";
+import {
+  SlotPanelPosition,
+  type ScoredResult,
+  type SearchResponse,
+} from "../../types";
+import { hideAcDropdown } from "../../utils/autocomplete";
 import { setActiveTab } from "../../utils/navigation";
+import { buildPaginationHtml } from "../../utils/pagination";
+import { navigateToSearch } from "../../utils/search-navigation";
 import { fetchSlotPanels } from "../../utils/search-utils";
 import {
+  abortStreamingSearch,
+  performStreamingSearch,
+} from "../../utils/streaming-search";
+import { renderTemplate } from "../../utils/template";
+import { closeMediaPreview, destroyMediaObserver } from "../media/media";
+import {
+  buildResultContext,
   clearSlotPanels,
   renderSidebar,
-  buildResultContext,
 } from "../renderer/render";
-import { closeMediaPreview, destroyMediaObserver } from "../media/media";
-import { hideAcDropdown } from "../../utils/autocomplete";
-import { skeletonResults } from "../../animations/skeleton";
-import { buildPaginationHtml } from "../../utils/pagination";
-import { renderTemplate } from "../../utils/template";
-import { SlotPanelPosition, type ScoredResult, type SearchResponse } from "../../types";
-import { performStreamingSearch, abortStreamingSearch } from "../../utils/streaming-search";
 
 let _streamingConfig: { enabled: boolean } | null = null;
 
@@ -41,10 +49,26 @@ export async function performTabSearch(
 ): Promise<void> {
   if (!query.trim()) return;
 
-  if (tabId.startsWith("engine:") && page === 1 && await _fetchStreamingConfig()) {
+  const isInit = state.isInitialLoad;
+  state.isInitialLoad = false;
+
+  if (!isInit && !state.postMethodEnabled) {
+    navigateToSearch(query, `tab:${tabId}`, page);
+    return;
+  }
+
+  if (
+    tabId.startsWith("engine:") &&
+    page === 1 &&
+    (await _fetchStreamingConfig())
+  ) {
     const engineType = tabId.replace("engine:", "");
     abortStreamingSearch();
-    return performStreamingSearch(query, engineType, (q) => void performTabSearch(q, tabId));
+    return performStreamingSearch(
+      query,
+      engineType,
+      (q) => void performTabSearch(q, tabId),
+    );
   }
 
   state.currentQuery = query;
@@ -79,7 +103,16 @@ export async function performTabSearch(
 
   const urlParams = new URLSearchParams({ q: query, type: `tab:${tabId}` });
   if (page > 1) urlParams.set("page", String(page));
-  history.pushState(null, "", `/search?${urlParams.toString()}`);
+  if (state.postMethodEnabled) {
+    const historyState = { degoog: true, query, type: `tab:${tabId}`, page };
+    if (isInit) {
+      history.replaceState(historyState, "", "/search");
+    } else {
+      history.pushState(historyState, "", "/search");
+    }
+  } else {
+    history.replaceState(null, "", `/search?${urlParams.toString()}`);
+  }
 
   try {
     const params = new URLSearchParams({
@@ -107,13 +140,11 @@ export async function performTabSearch(
 
     state.currentData = {
       results: state.currentResults,
-      atAGlance: null,
       query,
       totalTime,
       type: `tab:${tabId}`,
       engineTimings: timings,
       relatedSearches: [],
-      knowledgePanel: null,
     } satisfies SearchResponse;
     renderSidebar(state.currentData, (q) => void performTabSearch(q, tabId));
 
@@ -123,9 +154,11 @@ export async function performTabSearch(
       _renderTabPagination(pagination, data.totalPages, page, query, tabId);
     }
 
-    const panels = await fetchSlotPanels(query);
+    const panels = await fetchSlotPanels(query, data.results);
     renderSidebar(state.currentData, (q) => void performTabSearch(q, tabId), {
-      sidebarTopPanels: panels.filter((p) => p.position === SlotPanelPosition.KnowledgePanel),
+      sidebarTopPanels: panels.filter(
+        (p) => p.position === SlotPanelPosition.KnowledgePanel,
+      ),
     });
   } catch {
     if (resultsMeta) resultsMeta.textContent = "";

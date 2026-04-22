@@ -12,17 +12,17 @@
  */
 
 import { fetch as bunFetch } from "bun";
-import { getSettings } from "./plugin-settings";
-import { isSocksProxy, fetchViaSocks } from "./socks-fetch";
-import { fetchViaHttpProxy } from "./http-proxy-fetch";
 import { resolveTransport } from "../extensions/transports/registry";
-import { debug } from "./logger";
 import type {
-  Transport,
-  TransportFetchOptions,
-  TransportContext,
   ProxyAwareFetch,
-} from "../extensions/transports/types";
+  Transport,
+  TransportContext,
+  TransportFetchOptions,
+} from "../types";
+import { fetchViaHttpProxy } from "./http-proxy-fetch";
+import { logger } from "./logger";
+import { getSettings } from "./plugin-settings";
+import { fetchViaSocks, isSocksProxy } from "./socks-fetch";
 
 export type { TransportFetchOptions as OutgoingFetchOptions };
 
@@ -154,9 +154,12 @@ export async function outgoingFetch(
   const { transport, context } = await buildTransportContext(transportName);
   const host = new URL(url).hostname;
   if (context.proxyUrl) {
-    debug("outgoing", `${transport.name} via ${context.proxyUrl} -> ${host}`);
+    logger.debug(
+      "outgoing",
+      `${transport.name} via ${context.proxyUrl} -> ${host}`,
+    );
   } else {
-    debug("outgoing", `${transport.name} -> ${host}`);
+    logger.debug("outgoing", `${transport.name} -> ${host}`);
   }
   return transport.fetch(url, options, context);
 }

@@ -1,8 +1,10 @@
+import { readFile, writeFile } from "fs/promises";
 import { Hono, type Context } from "hono";
-import { getSettings, setSettings, asString } from "../utils/plugin-settings";
 import { getMiddleware } from "../extensions/middleware/registry";
-import { isPublicInstance } from "../utils/public-instance";
 import { outgoingFetch } from "../utils/outgoing";
+import { defaultEnginesFile } from "../utils/paths";
+import { asString, getSettings, setSettings } from "../utils/plugin-settings";
+import { isPublicInstance } from "../utils/public-instance";
 import { getRandomUserAgent } from "../utils/user-agents";
 
 const DEGOOG_SETTINGS_ID = "degoog-settings";
@@ -198,6 +200,12 @@ router.post("/api/settings/general", async (c) => {
     "streamingEnabled",
     "streamingAutoRetry",
     "streamingMaxRetries",
+    "postMethodEnabled",
+    "defaultTheme",
+    "domainBlockEnabled",
+    "domainBlockList",
+    "domainReplaceEnabled",
+    "domainReplaceList",
   ];
   const updates: Record<string, string> = {};
   for (const key of allowed) {
@@ -259,6 +267,41 @@ router.get("/api/settings/proxy-test", async (c) => {
     proxyIp,
     match: directIp !== null && proxyIp !== null && directIp === proxyIp,
   });
+});
+
+router.get("/api/settings/appearance", async (c) => {
+  const settings = await getSettings(DEGOOG_SETTINGS_ID);
+  return c.json({
+    theme: asString(settings.defaultTheme) || "system",
+  });
+});
+
+router.get("/api/settings/default-engines", async (c) => {
+  const token = getSettingsTokenFromRequest(c);
+  if (!(await validateSettingsToken(token))) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+  try {
+    const raw = await readFile(defaultEnginesFile(), "utf-8");
+    return c.json(JSON.parse(raw));
+  } catch {
+    return c.json({});
+  }
+});
+
+router.post("/api/settings/default-engines", async (c) => {
+  const token = getSettingsTokenFromRequest(c);
+  if (!(await validateSettingsToken(token))) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+  let body: Record<string, boolean>;
+  try {
+    body = await c.req.json<Record<string, boolean>>();
+  } catch {
+    return c.json({ error: "Invalid JSON" }, 400);
+  }
+  await writeFile(defaultEnginesFile(), JSON.stringify(body, null, 2), "utf-8");
+  return c.json({ ok: true });
 });
 
 export default router;

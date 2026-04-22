@@ -1,17 +1,22 @@
 import { Hono } from "hono";
 import {
-  matchBangCommand,
   getCommandsApiResponse,
+  matchBangCommand,
+  setCommandsLocale,
 } from "../extensions/commands/registry";
 import { searchSingleEngine } from "../search";
+import type { TimeFilter } from "../types";
+import { getLocale } from "../utils/hono";
+import { logger } from "../utils/logger";
 import { isDisabled } from "../utils/plugin-settings";
 import { getClientIp } from "../utils/request";
-import { debug } from "../utils/logger";
-import type { TimeFilter } from "../types";
+import { injectScope, translateHTML } from "../utils/translation";
 
 const router = new Hono();
 
 router.get("/api/commands", async (c) => {
+  const locale = getLocale(c);
+  if (locale) setCommandsLocale(locale);
   return c.json(await getCommandsApiResponse());
 });
 
@@ -58,24 +63,31 @@ router.get("/api/command", async (c) => {
       totalTime: timing.time,
       engineTimings: [timing],
       relatedSearches: [],
-      knowledgePanel: null,
-      atAGlance:
-        results.length > 0 && results[0].snippet
-          ? { ...results[0], score: 10, sources: [results[0].source] }
-          : null,
     });
   }
 
   const clientIp = getClientIp(c);
 
   const t0 = performance.now();
+
+  const language = getLocale(c);
+  if (language) match.command.t?.setLocale(language);
+
   const result = await match.command.execute(match.args, { clientIp, page });
-  debug("plugin", `${match.command.trigger} executed in ${Math.round(performance.now() - t0)}ms`);
+  logger.debug(
+    "plugin",
+    `${match.command.trigger} executed in ${Math.round(performance.now() - t0)}ms`,
+  );
   return c.json({
     type: "command",
     trigger: match.command.trigger,
     title: result.title,
-    html: result.html,
+    html: injectScope(
+      match.command.t
+        ? translateHTML(result.html, match.command.t)
+        : result.html,
+      `commands/${match.commandId}`,
+    ),
     action: result.action,
     page,
     totalPages: result.totalPages ?? 1,

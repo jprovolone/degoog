@@ -1,9 +1,10 @@
 import {
   SlotPanelPosition,
+  TranslateFunction,
   type SettingField,
   type SlotPlugin,
 } from "../../../../types";
-import { getSettings, asString } from "../../../../utils/plugin-settings";
+import { asString, getSettings } from "../../../../utils/plugin-settings";
 
 export const AI_SUMMARY_ID = "ai-summary";
 
@@ -53,7 +54,6 @@ export const aiSummarySettingsSchema: SettingField[] = [
 ];
 
 export interface AISummarySettings {
-  enabled: boolean;
   baseUrl: string;
   model: string;
   apiKey: string;
@@ -66,7 +66,6 @@ export async function getAISummarySettings(): Promise<AISummarySettings> {
   const timeoutSeconds =
     parseFloat(asString(stored["timeoutSeconds"]) || "") || 30;
   return {
-    enabled: asString(stored["enabled"]) === "true",
     baseUrl: asString(stored["baseUrl"]),
     model: asString(stored["model"]),
     apiKey: asString(stored["apiKey"]),
@@ -129,7 +128,7 @@ export async function generateAISummary(
   results: { title: string; url: string; snippet: string }[],
 ): Promise<string | null> {
   const settings = await getAISummarySettings();
-  if (!settings.enabled || !settings.baseUrl || !settings.model) return null;
+  if (!settings.baseUrl || !settings.model) return null;
 
   const context = results
     .slice(0, 6)
@@ -154,7 +153,7 @@ export async function chatFollowUp(
   history: OpenAIMessage[],
 ): Promise<string | null> {
   const settings = await getAISummarySettings();
-  if (!settings.enabled || !settings.baseUrl || !settings.model) return null;
+  if (!settings.baseUrl || !settings.model) return null;
   return chatComplete(settings, history, 512);
 }
 
@@ -162,12 +161,17 @@ const aiSummarySlot: SlotPlugin = {
   id: AI_SUMMARY_ID,
   settingsId: AI_SUMMARY_ID,
   name: "AI Summary",
-  description:
-    "Replaces At a Glance with a brief AI-generated summary using any OpenAI-compatible provider",
+  waitForResults: true,
+  get description(): string {
+    return this.t!("ai-summary.description");
+  },
   position: SlotPanelPosition.AtAGlance,
+
+  t: TranslateFunction,
+
   async trigger(): Promise<boolean> {
     const settings = await getAISummarySettings();
-    return settings.enabled && !!settings.baseUrl && !!settings.model;
+    return !!settings.baseUrl && !!settings.model;
   },
   async execute(query, context): Promise<{ title?: string; html: string }> {
     const results = context?.results ?? [];
@@ -183,11 +187,11 @@ const aiSummarySlot: SlotPlugin = {
         "</div>" +
         "</div>" +
         '<div class="glance-ai-footer">' +
-        '<span class="glance-ai-badge">AI Summary</span>' +
-        '<button class="glance-ai-dive" type="button">Dive deeper</button>' +
+        `<span class="glance-ai-badge">${this.t!("ai-summary.badge")}</span>` +
+        `<button class="glance-ai-dive" type="button">${this.t!("ai-summary.dive-deeper")}</button>` +
         "</div>" +
         '<div class="glance-ai-chat" hidden>' +
-        '<textarea class="glance-ai-input" placeholder="Ask a follow-up\u2026" rows="1"></textarea>' +
+        `<textarea class="glance-ai-input" placeholder="${this.t!("ai-summary.follow-up-placeholder")}" rows="1"></textarea>` +
         "</div>" +
         "</div>",
     };

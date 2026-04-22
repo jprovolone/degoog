@@ -14,7 +14,7 @@ usage() {
   echo "  COUNT        Number of requests (default: 30)"
   echo "  CONCURRENCY  Parallel requests (default: 1)"
   echo ""
-  echo "Server must have LOGGER=debug for /api/rate-limit/test to respond."
+  echo "Server must have LOG_LEVEL=debug for /api/rate-limit/test to respond."
   echo "Example: COUNT=50 CONCURRENCY=5 $0"
   exit 0
 }

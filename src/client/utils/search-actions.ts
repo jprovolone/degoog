@@ -1,34 +1,47 @@
-import { state } from "../state";
-import { MAX_PAGE, BUILTIN_SEARCH_TYPES } from "../constants";
-import { setActiveTab } from "./navigation";
-import { getEngines } from "./engines";
-import { buildSearchUrl } from "./url";
-import { buildPaginationHtml } from "./pagination";
 import {
-  destroyMediaObserver,
+  skeletonGlance,
+  skeletonImageGrid,
+  skeletonResults,
+  skeletonVideoGrid,
+} from "../animations/skeleton";
+import { BUILTIN_SEARCH_TYPES, MAX_PAGE } from "../constants";
+import {
   closeMediaPreview,
+  destroyMediaObserver,
 } from "../modules/media/media";
-import { renderAtAGlance } from "../modules/renderer/render-slots";
 import {
+  clearSlotPanels,
   renderResults,
   renderSidebar,
-  clearSlotPanels,
 } from "../modules/renderer/render";
 import { renderMediaEngineBar } from "../modules/renderer/render-media";
+import { state } from "../state";
+import {
+  SlotPanelPosition,
+  type Command,
+  type ScoredResult,
+  type SearchResponse,
+} from "../types";
 import { hideAcDropdown } from "./autocomplete";
+import { getEngines } from "./engines";
+import { setActiveTab } from "./navigation";
+import { buildPaginationHtml } from "./pagination";
 import {
-  setResultsMeta,
-  runScriptsInContainer,
   getNaturalLanguageBangQuery,
+  runScriptsInContainer,
+  setResultsMeta,
 } from "./search-helpers";
+import { navigateToSearch } from "./search-navigation";
 import {
+  buildCommandGlanceHtml,
   fetchGlancePanels,
   fetchSlotPanels,
-  buildCommandGlanceHtml,
 } from "./search-utils";
-import { skeletonResults, skeletonGlance, skeletonImageGrid, skeletonVideoGrid } from "../animations/skeleton";
-import { type Command, type SearchResponse, type ScoredResult } from "../types";
-import { performStreamingSearch, abortStreamingSearch } from "./streaming-search";
+import {
+  abortStreamingSearch,
+  performStreamingSearch,
+} from "./streaming-search";
+import { buildSearchBody, buildSearchUrl } from "./url";
 
 let commandsCache: Command[] | null = null;
 let _streamingConfig: { enabled: boolean } | null = null;
@@ -66,7 +79,7 @@ const _fetchCommands = async (): Promise<Command[]> => {
       commandsCache = body.commands || [];
       return commandsCache;
     }
-  } catch { }
+  } catch {}
   return [];
 };
 
@@ -74,9 +87,18 @@ export async function performSearch(
   query: string,
   type?: string,
   page?: number,
+  options?: { forceAjax?: boolean },
 ): Promise<void> {
   const resolvedType = type || state.currentType || "web";
   if (!query.trim()) return;
+
+  const isInit = state.isInitialLoad;
+  state.isInitialLoad = false;
+
+  if (!isInit && !options?.forceAjax && !state.postMethodEnabled) {
+    navigateToSearch(query, resolvedType, page);
+    return;
+  }
 
   if (resolvedType.startsWith("tab:")) {
     const { performTabSearch } = await import("../modules/tabs/tab-search");
@@ -105,29 +127,38 @@ export async function performSearch(
     return _performBangCommand(query, resolvedType, page || 1);
   }
 
-  if ((!page || page === 1) && await _fetchStreamingConfig()) {
+  if (
+    !state.postMethodEnabled &&
+    (!page || page === 1) &&
+    (await _fetchStreamingConfig())
+  ) {
     abortStreamingSearch();
-    return performStreamingSearch(query, resolvedType, (q) => void performSearch(q));
+    return performStreamingSearch(
+      query,
+      resolvedType,
+      (q) => void performSearch(q),
+    );
   }
 
+  const resolvedPage = page && page > 0 ? page : 1;
   state.currentQuery = query;
   state.currentType = resolvedType;
-  state.currentPage = 1;
+  state.currentPage = resolvedPage;
   state.lastPage = MAX_PAGE;
-  state.imagePage = 1;
+  state.imagePage = resolvedPage;
   state.imageLastPage = MAX_PAGE;
-  state.videoPage = 1;
+  state.videoPage = resolvedPage;
   state.videoLastPage = MAX_PAGE;
   destroyMediaObserver();
 
   const engines = await getEngines();
-  const url = buildSearchUrl(query, engines, resolvedType, 1);
-
+  const url = buildSearchUrl(query, engines, resolvedType, resolvedPage);
 
   setActiveTab(resolvedType);
   closeMediaPreview();
   hideAcDropdown(document.getElementById("ac-dropdown-home"));
   hideAcDropdown(document.getElementById("ac-dropdown-results"));
+
   const resultsInput = document.getElementById(
     "results-search-input",
   ) as HTMLInputElement | null;
@@ -162,9 +193,24 @@ export async function performSearch(
   clearSlotPanels();
   document.title = `${query} - degoog`;
 
-  const urlParams = new URLSearchParams({ q: query });
-  if (resolvedType !== "web") urlParams.set("type", resolvedType);
-  history.pushState(null, "", `/search?${urlParams.toString()}`);
+  if (state.postMethodEnabled) {
+    const historyState = {
+      degoog: true,
+      query,
+      type: resolvedType,
+      page: resolvedPage,
+    };
+    if (isInit) {
+      history.replaceState(historyState, "", "/search");
+    } else {
+      history.pushState(historyState, "", "/search");
+    }
+  } else {
+    const urlParams = new URLSearchParams({ q: query });
+    if (resolvedType !== "web") urlParams.set("type", resolvedType);
+    if (resolvedPage > 1) urlParams.set("page", String(resolvedPage));
+    history.replaceState(null, "", `/search?${urlParams.toString()}`);
+  }
 
   const commands = await _fetchCommands();
   const bangQuery = commands.length
@@ -176,7 +222,16 @@ export async function performSearch(
   }
 
   try {
-    const res = await fetch(url);
+    const res = state.postMethodEnabled
+      ? await fetch("/api/search", {
+          method: "POST",
+          body: JSON.stringify(
+            buildSearchBody(query, engines, resolvedType, resolvedPage),
+          ),
+          headers: { "Content-Type": "application/json" },
+        })
+      : await fetch(url);
+
     const data = (await res.json()) as SearchResponse;
     state.currentResults = data.results;
     state.currentData = data;
@@ -192,8 +247,17 @@ export async function performSearch(
     } else {
       renderSidebar(data, (q) => void performSearch(q));
       if (resolvedType === "web") {
-        void fetchGlancePanels(query, data.results, data.atAGlance);
-        void fetchSlotPanels(query);
+        void fetchGlancePanels(query, data.results);
+        void fetchSlotPanels(query, data.results).then((panels) => {
+          const kpPanels = panels.filter(
+            (p) => p.position === SlotPanelPosition.KnowledgePanel,
+          );
+          if (kpPanels.length > 0) {
+            renderSidebar(data, (q) => void performSearch(q), {
+              sidebarTopPanels: kpPanels,
+            });
+          }
+        });
       } else {
         if (glanceEl) glanceEl.innerHTML = "";
       }
@@ -235,7 +299,16 @@ async function _performSearchWithBang(
     } else {
       renderSidebar(searchData, (q) => void performSearch(q));
       if (type === "web") {
-        void fetchSlotPanels(query);
+        void fetchSlotPanels(query, searchData.results).then((panels) => {
+          const kpPanels = panels.filter(
+            (p) => p.position === SlotPanelPosition.KnowledgePanel,
+          );
+          if (kpPanels.length > 0) {
+            renderSidebar(searchData, (q) => void performSearch(q), {
+              sidebarTopPanels: kpPanels,
+            });
+          }
+        });
       } else {
         if (glanceEl) glanceEl.innerHTML = "";
       }
@@ -246,7 +319,6 @@ async function _performSearchWithBang(
       const cmdData = (await cmdRes.json()) as {
         type: string;
         results?: ScoredResult[];
-        atAGlance?: { snippet: string } | null;
         title?: string;
         html?: string;
       };
@@ -271,7 +343,6 @@ async function _performBangCommand(
   _type: string,
   page = 1,
 ): Promise<void> {
-
   closeMediaPreview();
   hideAcDropdown(document.getElementById("ac-dropdown-home"));
   hideAcDropdown(document.getElementById("ac-dropdown-results"));
@@ -298,7 +369,15 @@ async function _performBangCommand(
 
   const urlParams = new URLSearchParams({ q: query });
   if (page > 1) urlParams.set("page", String(page));
-  history.pushState(null, "", `/search?${urlParams.toString()}`);
+  if (state.postMethodEnabled) {
+    history.pushState(
+      { degoog: true, query, type: "web", page },
+      "",
+      "/search",
+    );
+  } else {
+    history.replaceState(null, "", `/search?${urlParams.toString()}`);
+  }
 
   try {
     const apiParams = new URLSearchParams({ q: query });
@@ -312,12 +391,6 @@ async function _performBangCommand(
       type: string;
       results?: ScoredResult[];
       totalTime?: number;
-      atAGlance?: {
-        snippet: string;
-        url: string;
-        title: string;
-        sources: string[];
-      } | null;
       title?: string;
       html?: string;
       totalPages?: number;
@@ -328,7 +401,6 @@ async function _performBangCommand(
       state.currentData = data as unknown as SearchResponse;
       if (resultsMeta)
         resultsMeta.textContent = `About ${data.results?.length ?? 0} results (${((data.totalTime ?? 0) / 1000).toFixed(2)} seconds)`;
-      renderAtAGlance(data.atAGlance ?? null);
       renderResults(data.results ?? []);
       return;
     }
@@ -371,6 +443,12 @@ function _renderBangPagination(
 
 export async function goToPage(pageNum: number): Promise<void> {
   if (pageNum === state.currentPage) return;
+
+  if (!state.postMethodEnabled) {
+    navigateToSearch(state.currentQuery, state.currentType, pageNum);
+    return;
+  }
+
   const resultsList = document.getElementById("results-list");
   const pagination = document.getElementById("pagination");
   if (resultsList) {
@@ -393,18 +471,42 @@ export async function goToPage(pageNum: number): Promise<void> {
     pageNum,
   );
   try {
-    const res = await fetch(url);
+    const res = state.postMethodEnabled
+      ? await fetch("/api/search", {
+          method: "POST",
+          body: JSON.stringify(
+            buildSearchBody(
+              state.currentQuery,
+              engines,
+              state.currentType,
+              pageNum,
+            ),
+          ),
+          headers: { "Content-Type": "application/json" },
+        })
+      : await fetch(url);
+
     const data = (await res.json()) as SearchResponse;
     state.currentResults = data.results;
     state.currentData = data;
     state.currentPage = pageNum;
+    history.pushState(
+      {
+        degoog: true,
+        query: state.currentQuery,
+        type: state.currentType,
+        page: pageNum,
+      },
+      "",
+      "/search",
+    );
     const metaText = `About ${state.currentResults.length} results — Page ${state.currentPage}`;
     setResultsMeta(metaText);
-    if (state.currentPage === 1 && data.atAGlance) {
-      renderAtAGlance(data.atAGlance);
+    if (state.currentPage === 1 && state.currentType === "web") {
+      void fetchGlancePanels(state.currentQuery, data.results);
     }
     if (state.currentType === "web") {
-      void fetchSlotPanels(state.currentQuery);
+      void fetchSlotPanels(state.currentQuery, state.currentResults);
     }
     renderResults(state.currentResults);
     window.scrollTo(0, 0);
@@ -437,7 +539,25 @@ export async function retryEngine(engineName: string): Promise<void> {
   }
 
   try {
-    const res = await fetch(`/api/search/retry?${params.toString()}`);
+    const res = state.postMethodEnabled
+      ? await fetch("/api/search/retry", {
+          method: "POST",
+          body: JSON.stringify({
+            query: state.currentQuery,
+            engine: engineName,
+            engines: Object.entries(engines)
+              .filter(([, v]) => v)
+              .map(([k]) => k),
+            type: state.currentType !== "web" ? state.currentType : undefined,
+            page: state.currentPage > 1 ? state.currentPage : undefined,
+            time:
+              state.currentTimeFilter !== "any"
+                ? state.currentTimeFilter
+                : undefined,
+          }),
+          headers: { "Content-Type": "application/json" },
+        })
+      : await fetch(`/api/search/retry?${params.toString()}`);
     const data = (await res.json()) as SearchResponse & {
       results: ScoredResult[];
     };
@@ -450,16 +570,12 @@ export async function retryEngine(engineName: string): Promise<void> {
       state.currentResults = data.results;
       if (state.currentData) {
         state.currentData.results = data.results;
-        if (data.atAGlance) state.currentData.atAGlance = data.atAGlance;
       }
 
       const resultsMeta = document.getElementById("results-meta");
       if (resultsMeta)
         resultsMeta.textContent = `About ${data.results.length} results (${((state.currentData?.totalTime ?? 0) / 1000).toFixed(2)} seconds)`;
 
-      if (state.currentType === "web" && state.currentData?.atAGlance) {
-        renderAtAGlance(state.currentData.atAGlance);
-      }
       renderResults(data.results);
     }
 
@@ -470,7 +586,7 @@ export async function retryEngine(engineName: string): Promise<void> {
     } else if (state.currentData) {
       renderSidebar(state.currentData, (q) => void performSearch(q));
     }
-  } catch { }
+  } catch {}
 }
 
 export async function performLucky(query: string): Promise<void> {

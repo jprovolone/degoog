@@ -20,4 +20,6 @@ export const state: AppState = {
   openInNewTab: false,
   displayEnginePerformance: true,
   displaySearchSuggestions: true,
+  postMethodEnabled: false,
+  isInitialLoad: false,
 };

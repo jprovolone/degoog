@@ -1,19 +1,20 @@
-import { performSearch } from "../utils/search-actions";
-import { performTabSearch } from "./tabs/tab-search";
-import { recordSettingsReturn, showHome } from "../utils/navigation";
-import { initAutocomplete } from "../utils/autocomplete";
 import { initLuckyAnimation } from "../animations/lucky-animation";
-import { initTabs } from "./tabs/tabs";
-import { initMediaPreview } from "./media/media-preview";
-import { initTheme } from "../utils/theme";
-import { initOptionsDropdown } from "../utils/time-filter";
-import { idbGet } from "../utils/db";
 import {
-  OPEN_IN_NEW_TAB_KEY,
   DISPLAY_ENGINE_PERFORMANCE,
   DISPLAY_SEARCH_SUGGESTIONS,
+  OPEN_IN_NEW_TAB_KEY,
+  POST_METHOD_ENABLED,
 } from "../constants";
 import { state } from "../state";
+import { initAutocomplete } from "../utils/autocomplete";
+import { idbGet } from "../utils/db";
+import { recordSettingsReturn, showHome } from "../utils/navigation";
+import { performSearch } from "../utils/search-actions";
+import { initTheme } from "../utils/theme";
+import { initOptionsDropdown } from "../utils/time-filter";
+import { initMediaPreview } from "./media/media-preview";
+import { performTabSearch } from "./tabs/tab-search";
+import { initTabs } from "./tabs/tabs";
 
 import { initInstallPrompt } from "../utils/install-prompt";
 import { initSearchBarActions } from "../utils/search-bar-actions";
@@ -66,6 +67,21 @@ export function init(): void {
     "results-search-input",
   ) as HTMLInputElement | null;
 
+  document
+    .getElementById("search-form-home")
+    ?.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const query = searchInput?.value.trim();
+      if (!query) return;
+      if (state.postMethodEnabled) {
+        // Little hack to ensure we do not send the query in the URL
+        sessionStorage.setItem("degoog-post-query", query);
+        window.location.href = "/search";
+      } else {
+        window.location.href = `/search?${new URLSearchParams({ q: query }).toString()}`;
+      }
+    });
+
   resultsInput?.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && resultsInput)
       void performSearch(resultsInput.value);
@@ -113,6 +129,9 @@ export function init(): void {
   void idbGet<boolean>(DISPLAY_SEARCH_SUGGESTIONS).then((v) => {
     if (v !== null) state.displaySearchSuggestions = v;
   });
+  void idbGet<boolean>(POST_METHOD_ENABLED).then((v) => {
+    if (v !== null) state.postMethodEnabled = v;
+  });
 
   document.body.addEventListener("click", (e) => {
     const btn = (e.target as HTMLElement).closest<HTMLElement>(".uuid-copy");
@@ -140,18 +159,48 @@ export function init(): void {
 
   const params = new URLSearchParams(window.location.search);
   const q = params.get("q");
-  const type = params.get("type") || "web";
-  const page = parseInt(params.get("page") ?? "1", 10) || 1;
-  if (q) {
-    if (searchInput) searchInput.value = q;
+  const postQuery = sessionStorage.getItem("degoog-post-query");
+  const postType = sessionStorage.getItem("degoog-post-type");
+  const postPage = sessionStorage.getItem("degoog-post-page");
+
+  if (postQuery) sessionStorage.removeItem("degoog-post-query");
+  if (postType) sessionStorage.removeItem("degoog-post-type");
+  if (postPage) sessionStorage.removeItem("degoog-post-page");
+
+  const resolvedQ = q || postQuery;
+  const type = params.get("type") || postType || "web";
+  const page = parseInt(params.get("page") ?? postPage ?? "1", 10) || 1;
+  if (resolvedQ) {
+    state.isInitialLoad = true;
+    if (searchInput) searchInput.value = resolvedQ;
     if (type.startsWith("tab:")) {
       void (async () => {
         const { getPluginTabIds } = await import("./tabs/tabs");
         await getPluginTabIds();
-        performTabSearch(q, type.slice(4), page);
+        performTabSearch(resolvedQ, type.slice(4), page);
       })();
     } else {
-      void performSearch(q, type, page);
+      void performSearch(resolvedQ, type, page);
     }
   }
+
+  window.addEventListener("popstate", (e) => {
+    if (!state.postMethodEnabled) return;
+    const hs = e.state as {
+      degoog: boolean;
+      query: string;
+      type: string;
+      page: number;
+    } | null;
+    if (hs?.degoog) {
+      state.isInitialLoad = true;
+      if (hs.type?.startsWith("tab:")) {
+        void performTabSearch(hs.query, hs.type.slice(4), hs.page);
+      } else {
+        void performSearch(hs.query, hs.type, hs.page);
+      }
+    } else {
+      window.location.reload();
+    }
+  });
 }

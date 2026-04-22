@@ -1,25 +1,28 @@
+import {
+  getActiveWebEngines,
+  getEngineDefaultTransport,
+  getEngineIdByInstance,
+  getEngineMap,
+  getEnginesForSearchType,
+} from "./extensions/engines/registry";
+import { resolveTransport } from "./extensions/transports/registry";
 import type {
-  SearchEngine,
-  SearchResult,
-  ScoredResult,
-  SearchResponse,
   EngineConfig,
-  SearchType,
-  EngineTiming,
-  KnowledgePanel,
-  TimeFilter,
   EngineContext,
+  EngineTiming,
+  ScoredResult,
+  SearchEngine,
+  SearchResponse,
+  SearchResult,
+  SearchType,
+  TimeFilter,
 } from "./types";
 import {
-  getEngineMap,
-  getActiveWebEngines,
-  getEnginesForSearchType,
-  getEngineIdByInstance,
-  getEngineDefaultTransport,
-} from "./extensions/engines/registry";
-import { getSettings, asString } from "./utils/plugin-settings";
+  filterBlockedDomains,
+  applyDomainReplacements,
+} from "./utils/domain-filter";
 import { outgoingFetch, parseOutgoingTransport } from "./utils/outgoing";
-import { resolveTransport } from "./extensions/transports/registry";
+import { asString, getSettings } from "./utils/plugin-settings";
 
 const MAX_PAGE = 10;
 const ENGINE_TIMEOUT_MS = 10_000;
@@ -33,8 +36,7 @@ const _getEngineTimeout = async (
   let raw =
     asString((await getSettings(engineSettingsId)).outgoingTransport) ||
     undefined;
-  if (!raw)
-    raw = getEngineDefaultTransport(engineSettingsId) ?? undefined;
+  if (!raw) raw = getEngineDefaultTransport(engineSettingsId) ?? undefined;
   const transportName = parseOutgoingTransport(raw);
   const transport = resolveTransport(transportName);
   if (transport.timeoutMs && transport.timeoutMs > ENGINE_TIMEOUT_MS) {
@@ -115,63 +117,6 @@ export const fetchRelatedSearches = async (
   }
 };
 
-export const fetchKnowledgePanel = async (
-  query: string,
-): Promise<KnowledgePanel | null> => {
-  try {
-    const params = new URLSearchParams({
-      action: "query",
-      titles: query,
-      prop: "extracts|pageimages|info",
-      exintro: "1",
-      explaintext: "1",
-      pithumbsize: "300",
-      inprop: "url",
-      format: "json",
-      redirects: "1",
-    });
-    const res = await outgoingFetch(
-      `https://en.wikipedia.org/w/api.php?${params.toString()}`,
-      {
-        headers: { "Api-User-Agent": "degoog/1.0" },
-      },
-    );
-    const data = (await res.json()) as {
-      query: {
-        pages: Record<
-          string,
-          {
-            title: string;
-            extract?: string;
-            thumbnail?: { source: string };
-            fullurl?: string;
-            pageid: number;
-          }
-        >;
-      };
-    };
-    const pages = data.query.pages;
-    const page = Object.values(pages)[0];
-    if (
-      !page ||
-      page.pageid === undefined ||
-      (page as Record<string, unknown>).missing !== undefined ||
-      !page.extract
-    )
-      return null;
-    return {
-      title: page.title,
-      description: page.extract.substring(0, 500),
-      image: page.thumbnail?.source,
-      url:
-        page.fullurl ||
-        `https://en.wikipedia.org/wiki/${encodeURIComponent(page.title)}`,
-    };
-  } catch {
-    return null;
-  }
-};
-
 const _withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
   return Promise.race([
     promise,
@@ -222,25 +167,34 @@ export const createSearchEngineContext = (
   lang?: string,
   dateFrom?: string,
   dateTo?: string,
-): EngineContext => ({
-  fetch: async (url, init) => {
-    let raw: string | undefined;
-    if (engineSettingsId !== undefined) {
-      raw =
-        asString((await getSettings(engineSettingsId)).outgoingTransport) ||
-        undefined;
-    }
-    if (!raw && engineSettingsId !== undefined) {
-      raw = getEngineDefaultTransport(engineSettingsId) ?? undefined;
-    }
-    const transport = parseOutgoingTransport(raw);
-    return outgoingFetch(url, init ?? {}, transport);
-  },
-  lang: lang || undefined,
-  dateFrom: dateFrom || undefined,
-  dateTo: dateTo || undefined,
-  buildAcceptLanguage: () => _buildAcceptLanguage(lang),
-});
+): EngineContext => {
+  const resolvedLang =
+    lang ||
+    (process.env.DEGOOG_DEFAULT_SEARCH_LANGUAGE || "")
+      .trim()
+      .split(/[-_]/)[0]
+      .toLowerCase() ||
+    undefined;
+  return {
+    fetch: async (url, init) => {
+      let raw: string | undefined;
+      if (engineSettingsId !== undefined) {
+        raw =
+          asString((await getSettings(engineSettingsId)).outgoingTransport) ||
+          undefined;
+      }
+      if (!raw && engineSettingsId !== undefined) {
+        raw = getEngineDefaultTransport(engineSettingsId) ?? undefined;
+      }
+      const transport = parseOutgoingTransport(raw);
+      return outgoingFetch(url, init ?? {}, transport);
+    },
+    lang: resolvedLang,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+    buildAcceptLanguage: () => _buildAcceptLanguage(resolvedLang),
+  };
+};
 
 export const searchSingleEngine = async (
   engineName: string,
@@ -312,13 +266,11 @@ export const search = async (
   if (rawActiveEngines.length === 0) {
     return {
       results: [],
-      atAGlance: null,
       query,
       totalTime: 0,
       type,
       engineTimings: [],
       relatedSearches: [],
-      knowledgePanel: null,
     };
   }
 
@@ -360,33 +312,26 @@ export const search = async (
   }
 
   const scored = scoreResults(allResults);
-  const atAGlance =
-    type === "web" && scored.length > 0 && scored[0].snippet ? scored[0] : null;
+  const filtered = await filterBlockedDomains(scored);
+  const processed = await applyDomainReplacements(filtered);
 
   let relatedSearches: string[] = [];
-  let knowledgePanel: KnowledgePanel | null = null;
 
   if (type === "web" && p === 1) {
-    [relatedSearches, knowledgePanel] = await Promise.all([
-      _withTimeout(fetchRelatedSearches(query), ENGINE_TIMEOUT_MS).catch(
-        () => [],
-      ),
-      _withTimeout(fetchKnowledgePanel(query), ENGINE_TIMEOUT_MS).catch(
-        () => null,
-      ),
-    ]);
+    relatedSearches = await _withTimeout(
+      fetchRelatedSearches(query),
+      ENGINE_TIMEOUT_MS,
+    ).catch(() => []);
   }
 
   const totalTime = Math.round(performance.now() - start);
 
   return {
-    results: scored,
-    atAGlance,
+    results: processed,
     query,
     totalTime,
     type,
     engineTimings,
     relatedSearches,
-    knowledgePanel,
   };
 };

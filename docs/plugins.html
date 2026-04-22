@@ -47,6 +47,8 @@
           <li><a href="aliases.html">Aliases</a></li>
           <li><a href="env.html">Environment</a></li>
           <li><a href="styling.html">Styling</a></li>
+          <li><a href="translations.html">Translations</a></li>
+          <li><a href="api.html">API</a></li>
         </ul>
       </nav>
 
@@ -281,8 +283,9 @@
             <strong>execute(query, context)</strong> (async) — Return
             <code>{ title?: string, html: string }</code>. Return
             <code>{ html: "" }</code> to show nothing. <code>context</code> has
-            <code>clientIp</code> and, for <code>at-a-glance</code> slots only,
-            <code>results</code> (the search results array).
+            <code>clientIp</code> and <code>results</code> (the search results
+            array) — only populated if <code>waitForResults: true</code> is set
+            on the plugin.
           </li>
         </ul>
         <p>
@@ -293,24 +296,33 @@
           are shown.
         </p>
         <p>
+          Optional: <strong>waitForResults</strong> — Set to
+          <code>true</code> to receive <code>context.results</code> in
+          <code>execute()</code>. Results are always available at execution time
+          (slots run after the search completes), but are only passed to the
+          plugin if this flag is set. Defaults to <code>false</code> so plugins
+          that don't need results remain independent.
+        </p>
+        <p>
           Optional: <strong>slotPositions</strong> — Array of position values
-          (e.g. <code>["knowledge-panel", "above-sidebar", "below-sidebar"]</code>).
-          If present and non-empty, the app adds a <strong>Position</strong>
-          dropdown in the plugin settings; the user can choose which of these
-          positions the slot uses. If empty or omitted, the slot uses the
-          fixed <code>position</code> only.
+          (e.g.
+          <code>["knowledge-panel", "above-sidebar", "below-sidebar"]</code>).
+          If present and non-empty, the app adds a
+          <strong>Position</strong> dropdown in the plugin settings; the user
+          can choose which of these positions the slot uses. If empty or
+          omitted, the slot uses the fixed <code>position</code> only.
         </p>
         <h3>Sidebar positions</h3>
         <p>
           <code>"above-sidebar"</code> — Renders at the top of the sidebar,
           before the main sidebar content. <code>"below-sidebar"</code> —
-          Renders at the bottom of the sidebar, after engine timings and
-          related searches.
+          Renders at the bottom of the sidebar, after engine timings and related
+          searches.
         </p>
         <h3>Knowledge panel slot</h3>
         <p>
-          <code>position: "knowledge-panel"</code> replaces only the first block in
-          the sidebar (the Wikipedia/knowledge panel). Engine Performance and
+          <code>position: "knowledge-panel"</code> replaces only the first block
+          in the sidebar (the Wikipedia/knowledge panel). Engine Performance and
           People also search for stay as-is. When a plugin returns content for
           this position, it is shown instead of the knowledge panel.
         </p>
@@ -323,9 +335,8 @@
             >POST /api/slots/glance</code
           >
           with body <code>{ query, results }</code>). Your
-          <code>execute(query, context)</code> receives
-          <code>context.results</code> so you can use the result list (e.g. for
-          an AI summary).
+          <code>execute(query, context)</code> always receives
+          <code>context.results</code> for at-a-glance slots.
         </p>
         <p><strong>Examples from the official store:</strong></p>
         <ul>
@@ -369,12 +380,13 @@
           </li>
         </ul>
         <p>
-          <strong>Slot API:</strong> <code>GET /api/slots?q=&lt;query&gt;</code>
-          returns panels for above-results, below-results, above-sidebar,
-          below-sidebar, knowledge-panel. <code>POST /api/slots/glance</code> with
-          body <code>{ query, results }</code> returns only at-a-glance panels.
-          Slots also run for custom tabs (e.g. weeb): the client fetches panels
-          after a tab-search and renders them in the same positions.
+          <strong>Slot API:</strong> <code>POST /api/slots</code> with body
+          <code>{ query, results }</code> returns panels for above-results,
+          below-results, above-sidebar, below-sidebar, knowledge-panel.
+          <code>POST /api/slots/glance</code> with body
+          <code>{ query, results }</code> returns only at-a-glance panels. Slots
+          also run for custom tabs (e.g. weeb): the client fetches panels after
+          a tab-search and renders them in the same positions.
         </p>
 
         <h2 id="search-result-tabs">Search result tabs</h2>
@@ -522,7 +534,7 @@ export default {
 
         <h2>Debugging plugins</h2>
         <p>
-          Set <code>LOGGER=debug</code> to log execution times for all plugin
+          Set <code>LOG_LEVEL=debug</code> to log execution times for all plugin
           types (slots, commands, tabs, routes) to the server console. See
           <a href="env.html">Environment variables</a> for details.
         </p>
