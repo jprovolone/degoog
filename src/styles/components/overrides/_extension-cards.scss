@@ -34,7 +34,7 @@
   &-info {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: $space-2;
     min-width: 0;
   }
 
@@ -70,7 +70,7 @@
     flex-shrink: 0;
 
     @media (max-width: 768px) {
-      justify-content: space-between;
+      justify-content: flex-end;
       width: 100%;
     }
   }

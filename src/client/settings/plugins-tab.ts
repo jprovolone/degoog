@@ -2,6 +2,7 @@ import { escapeHtml, getConfigStatus } from "../utils/dom";
 import { openModal } from "../modules/modals/settings-modal/modal";
 import type { ExtensionMeta, AllExtensions } from "../types";
 import { getBase } from "../utils/base-url";
+import { renderMdInline } from "../utils/md";
 
 const t = window.scopedT("core");
 
@@ -26,17 +27,13 @@ const _renderPluginCard = (
   orderable: boolean,
 ): string => {
   const isEnabled = plugin.settings["disabled"] !== "true";
-  const trigger =
-    plugin.type === "command" && plugin.trigger
-      ? `<span class="ext-card-trigger">!${escapeHtml(plugin.trigger)}</span>`
-      : "";
   const builtinBadge =
     plugin.source === "builtin"
       ? `<span class="degoog-badge">Built-in</span>`
       : "";
   const exposureIcon = _exposureIcon(plugin);
   const desc = plugin.description
-    ? `<span class="ext-card-desc">${escapeHtml(plugin.description)}</span>`
+    ? `<span class="ext-card-desc">${renderMdInline(plugin.description)}</span>`
     : "";
   const versionWarning = plugin.requiresNewerVersion
     ? `<span class="ext-version-warning">Requires a newer version of Degoog</span>`
@@ -74,11 +71,10 @@ const _renderPluginCard = (
       <div class="ext-card-main">
         <div class="ext-card-info">
           <div class="ext-card-name-row">
+            ${exposureIcon}
             <label for="plugin-toggle-${escapeHtml(plugin.id)}" class="ext-card-name plugin-toggle-label">${escapeHtml(plugin.displayName)}</label>
             ${builtinBadge}
-            ${exposureIcon}
           </div>
-          ${trigger}
           ${desc}
           ${versionWarning}
         </div>
@@ -122,19 +118,10 @@ const _savePriorities = async (group: HTMLElement): Promise<void> => {
   window.dispatchEvent(new CustomEvent("extensions-saved"));
 };
 
-export function initPluginsTab(allExtensions: AllExtensions): void {
-  const container = document.getElementById("plugins-content");
-  if (!container) return;
-
-  const all = [...allExtensions.plugins].sort(
-    (a, b) => _priority(b) - _priority(a),
-  );
-
-  let html = `<div class="ext-group"><div class="ext-cards ext-cards--orderable">`;
-  for (const plugin of all) html += _renderPluginCard(plugin, true);
-  html += `</div></div>`;
-  container.innerHTML = html;
-
+const _bindCards = (
+  container: HTMLElement,
+  all: ExtensionMeta[],
+): void => {
   container
     .querySelectorAll<HTMLElement>(".ext-cards--orderable")
     .forEach(_refreshOrderBtns);
@@ -163,7 +150,7 @@ export function initPluginsTab(allExtensions: AllExtensions): void {
     .forEach((btn) => {
       btn.addEventListener("click", () => {
         const id = btn.dataset.id;
-        const ext = allExtensions.plugins.find((p) => p.id === id);
+        const ext = all.find((p) => p.id === id);
         if (ext) openModal(ext);
       });
     });
@@ -185,5 +172,55 @@ export function initPluginsTab(allExtensions: AllExtensions): void {
         _refreshOrderBtns(cardsEl);
         void _savePriorities(cardsEl);
       });
+    });
+};
+
+const _renderCards = (
+  cardsEl: HTMLElement,
+  plugins: ExtensionMeta[],
+): void => {
+  let html = "";
+  for (const plugin of plugins) html += _renderPluginCard(plugin, true);
+  cardsEl.innerHTML = html;
+  _refreshOrderBtns(cardsEl);
+};
+
+let _pluginSearchQuery = "";
+
+export function initPluginsTab(allExtensions: AllExtensions): void {
+  const container = document.getElementById("plugins-content");
+  if (!container) return;
+
+  const all = [...allExtensions.plugins].sort(
+    (a, b) => _priority(b) - _priority(a),
+  );
+
+  container.innerHTML = `
+    <div class="store-filter-bar">
+      <input type="text" class="degoog-search-bar degoog-search-bar--square-advanced plugins-search-input" placeholder="Search plugins…" value="${_pluginSearchQuery}">
+    </div>
+    <div class="ext-group"><div class="ext-cards ext-cards--orderable"></div></div>`;
+
+  const cardsEl = container.querySelector<HTMLElement>(".ext-cards--orderable")!;
+
+  const applyFilter = (q: string): void => {
+    const filtered = q
+      ? all.filter(
+        (p) =>
+          p.displayName.toLowerCase().includes(q) ||
+          (p.description && p.description.toLowerCase().includes(q)),
+      )
+      : all;
+    _renderCards(cardsEl, filtered);
+    _bindCards(container, all);
+  };
+
+  applyFilter(_pluginSearchQuery);
+
+  container
+    .querySelector<HTMLInputElement>(".plugins-search-input")
+    ?.addEventListener("input", (e) => {
+      _pluginSearchQuery = (e.target as HTMLInputElement).value.trim().toLowerCase();
+      applyFilter(_pluginSearchQuery);
     });
 }

@@ -26,6 +26,7 @@ export interface ExtensionMeta {
   id: string;
   displayName: string;
   description: string;
+  searchType?: string;
   type: string;
   trigger?: string;
   configurable: boolean;

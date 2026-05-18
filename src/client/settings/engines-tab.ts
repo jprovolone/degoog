@@ -4,6 +4,7 @@ import { escapeHtml, getConfigStatus } from "../utils/dom";
 import { openModal } from "../modules/modals/settings-modal/modal";
 import type { ExtensionMeta, EngineRecord, AllExtensions } from "../types";
 import { getBase } from "../utils/base-url";
+import { renderMdInline } from "../utils/md";
 
 const t = window.scopedT("core");
 const themeT = window.scopedT("themes/degoog");
@@ -20,8 +21,7 @@ const _groupByType = (
 ): Record<string, ExtensionMeta[]> => {
   const groups: Record<string, ExtensionMeta[]> = {};
   for (const engine of engines) {
-    const type = engine.description.split(" ")[0].toLowerCase();
-    const label = _typeLabel(type);
+    const label = _typeLabel((engine.searchType ?? "web").toLowerCase());
     if (!groups[label]) groups[label] = [];
     groups[label].push(engine);
   }
@@ -34,6 +34,9 @@ const _renderEngineCard = (
   allowConfigure: boolean,
 ): string => {
   const isEnabled = enabledMap[engine.id] !== false;
+  const desc = engine.description
+    ? `<span class="ext-card-desc">${renderMdInline(engine.description)}</span>`
+    : "";
   const versionWarning = engine.requiresNewerVersion
     ? `<span class="ext-version-warning">Requires a newer version of Degoog</span>`
     : "";
@@ -54,6 +57,7 @@ const _renderEngineCard = (
       <div class="ext-card-main">
         <div class="ext-card-info">
           <label for="engine-toggle-${escapeHtml(engine.id)}" class="ext-card-name engine-toggle-label">${escapeHtml(engine.displayName)}</label>
+          ${desc}
           ${versionWarning}
         </div>
         <div class="ext-card-actions">

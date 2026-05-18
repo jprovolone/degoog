@@ -82,7 +82,7 @@ interface GoogleImageResult {
 }
 
 export class GoogleImagesEngine implements SearchEngine {
-  name = "Google Images (NEEDS FPLAY TRANSPORT)";
+  name = "Google Images";
   safeSearch: string = "off";
   disabledByDefault: boolean = true;
   settingsSchema: SettingField[] = [

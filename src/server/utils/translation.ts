@@ -23,7 +23,7 @@ export const getClosestLanguage = (
   const baseMatch = availableLangs.find((l) => l.split("-")[0] === baseLang);
   if (baseMatch) return baseMatch;
 
-  logger.debug(
+  logger.translation(
     "translation",
     `No exact match for language "${lang}" or its base language "${baseLang}".`,
   );
@@ -41,7 +41,7 @@ export const dynamicImportTranslationFiles = async (
   path: string,
 ): Promise<TranslationRecord> => {
   const files = await readdir(join(path, "locales")).catch(() => {
-    logger.debug(
+    logger.translation(
       "translation",
       `No "locales" directory found at path "${path}". Skipping translation.`,
     );
@@ -69,7 +69,7 @@ export const dynamicImportTranslationFiles = async (
         );
       }
     } catch (e) {
-      logger.debug(
+      logger.translation(
         "translation",
         `Error loading translation file for language "${lang}" at path "${path}":`,
         e,
@@ -97,7 +97,7 @@ export const createTranslator = (translations: TranslationRecord) => {
       const closestLang = getClosestLanguage(locale, localeList);
 
       if (!closestLang) {
-        logger.debug(
+        logger.translation(
           "translation",
           `No available translations for locale "${locale}". Available languages: ${localeList.join(
             ", ",
@@ -130,7 +130,7 @@ export const createTranslator = (translations: TranslationRecord) => {
       }
 
       if (typeof value === "object" || typeof value === "undefined") {
-        logger.debug(
+        logger.translation(
           "translation",
           `Translation for key "${key}" in language "${locale}" is missing.`,
         );

@@ -2,6 +2,7 @@ import { escapeHtml } from "../../utils/dom";
 import { screenshotUrl } from "../store-lightbox";
 import type { RepoInfo, StoreItem } from "../../types/store-tab";
 import { getBase } from "../../utils/base-url";
+import { renderMdInline } from "../../utils/md";
 
 const OFFICIAL_REPO_URL =
   "https://github.com/degoog-org/official-extensions.git";
@@ -194,7 +195,7 @@ export function renderItemCard(
         <div class="store-card-main">
           <div class="store-card-name">${escapeHtml(item.name)}</div>
           <div class="store-card-meta">by ${author || "-"} · ${escapeHtml(item.repoName)}</div>
-          <div class="store-card-desc">${escapeHtml(item.description || "")}</div>
+          <div class="store-card-desc">${renderMdInline(item.description || "")}</div>
           <div class="store-card-version">${item.updateAvailable ? `<span class="store-card-version-old">v${escapeHtml(item.installedVersion || "?")}</span> → ` : ""}v${escapeHtml(item.version)}</div>
           ${item.requiresNewerVersion ? `<div class="store-card-version-warning">Requires a newer version of Degoog</div>` : ""}
         </div>

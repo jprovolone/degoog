@@ -1,4 +1,5 @@
 const LOG_LEVEL = process.env.LOG_LEVEL?.toLowerCase() || "info";
+const LOG_TRANSLATION = process.env.LOG_TRANSLATION?.toLowerCase() === "true";
 const LEVELS = ["fatal", "error", "warn", "info", "log", "debug"];
 const CONSOLE_LEVELS: Record<string, (...args: unknown[]) => void> = {
   fatal: console.error,
@@ -15,19 +16,31 @@ const CONSOLE_COLORS: Record<string, string> = {
   info: "\x1b[36m",
   log: "\x1b[37m",
   debug: "\x1b[90m",
+  translation: "\x1b[35m",
 };
 
-export const logger = LEVELS.reduce(
-  (acc, level) => {
-    acc[level] = (namespace: string, ...args: unknown[]) => {
-      if (LEVELS.indexOf(LOG_LEVEL) < LEVELS.indexOf(level)) return;
-      CONSOLE_LEVELS[level](
-        `${CONSOLE_COLORS[level]}${level.toUpperCase()} [${namespace}]\x1b[0m`,
-        ...args.map((e) => (e instanceof Error ? ["\n", e] : [e])).flat(),
-      );
-    };
+const fmt = (namespace: string, ...args: unknown[]) =>
+  args.map((e) => (e instanceof Error ? ["\n", e] : [e])).flat();
 
-    return acc;
+export const logger: Record<string, (namespace: string, ...args: unknown[]) => void> = {
+  ...LEVELS.reduce(
+    (acc, level) => {
+      acc[level] = (namespace: string, ...args: unknown[]) => {
+        if (LEVELS.indexOf(LOG_LEVEL) < LEVELS.indexOf(level)) return;
+        CONSOLE_LEVELS[level](
+          `${CONSOLE_COLORS[level]}${level.toUpperCase()} [${namespace}]\x1b[0m`,
+          ...fmt(namespace, ...args),
+        );
+      };
+      return acc;
+    },
+    {} as Record<string, (namespace: string, ...args: unknown[]) => void>,
+  ),
+  translation: (namespace: string, ...args: unknown[]) => {
+    if (!LOG_TRANSLATION) return;
+    console.debug(
+      `${CONSOLE_COLORS.translation}TRANSLATION [${namespace}]\x1b[0m`,
+      ...fmt(namespace, ...args),
+    );
   },
-  {} as Record<string, (namespace: string, ...args: unknown[]) => void>,
-);
+};

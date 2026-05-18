@@ -2,13 +2,14 @@ import { escapeHtml, getConfigStatus } from "../utils/dom";
 import { openModal } from "../modules/modals/settings-modal/modal";
 import type { ExtensionMeta, AllExtensions } from "../types";
 import { getBase } from "../utils/base-url";
+import { renderMdInline } from "../utils/md";
 
 const t = window.scopedT("core");
 
 const _renderTransportCard = (transport: ExtensionMeta): string => {
   const isEnabled = transport.settings["disabled"] !== "true";
   const desc = transport.description
-    ? `<span class="ext-card-desc">${escapeHtml(transport.description)}</span>`
+    ? `<span class="ext-card-desc">${renderMdInline(transport.description)}</span>`
     : "";
   const versionWarning = transport.requiresNewerVersion
     ? `<span class="ext-version-warning">Requires a newer version of Degoog</span>`

@@ -46,6 +46,7 @@ export interface EngineDefinition {
   displayName: string;
   searchType: EngineSearchType;
   EngineClass: new () => SearchEngine;
+  description?: string;
   disabledByDefault?: boolean;
   outgoingHosts?: string[];
   defaultTransport?: string;
@@ -95,6 +96,7 @@ const BUILTIN_DEFINITIONS: EngineDefinition[] = [
     displayName: "Google Images",
     searchType: "images",
     EngineClass: GoogleImagesEngine,
+    description: "Requires the [4play transport](https://github.com/degoog-org/official-extensions/tree/main/transports/degoog-fplay). Install it from the Store tab, then add the [browser extension](https://github.com/degoog-org/4play).",
     disabledByDefault: true,
     defaultTransport: "fplay",
   },
@@ -151,6 +153,7 @@ interface PluginEntry {
   id: string;
   displayName: string;
   searchType: EngineSearchType;
+  description?: string;
   instance: SearchEngine;
   disabledByDefault?: boolean;
   outgoingHosts?: string[];
@@ -183,6 +186,8 @@ const engineRegistry = createRegistry<PluginEntry>({
         typeof mod.type === "string" && (mod.type as string).trim()
           ? (mod.type as string)
           : "web",
+      description:
+        typeof mod.description === "string" ? mod.description : undefined,
       instance,
       outgoingHosts:
         Array.isArray(mod.outgoingHosts) &&
@@ -488,6 +493,7 @@ export async function getEngineExtensionMeta(
       id: e.id,
       displayName: e.displayName,
       searchType: e.searchType,
+      description: e.description,
       instance: e.instance,
     })),
   ];
@@ -613,7 +619,8 @@ export async function getEngineExtensionMeta(
     results.push({
       id: def.id,
       displayName: def.displayName,
-      description: `${effectiveType} search engine`,
+      description: def.description ?? "",
+      searchType: effectiveType,
       type: ExtensionStoreType.Engine,
       configurable: true,
       settingsSchema: schema,
