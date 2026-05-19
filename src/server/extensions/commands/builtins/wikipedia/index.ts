@@ -32,9 +32,8 @@ let _signProxyUrl: PluginContext["signProxyUrl"] | null = null;
 let _wikiCache!: TtlCache<WikiPage>;
 
 const _proxyImageUrl = (url: string): string => {
-  if (!url) return "";
-  if (_signProxyUrl) return _signProxyUrl(url);
-  return `/api/proxy/image?url=${encodeURIComponent(url)}`;
+  if (!url || !_signProxyUrl) return "";
+  return _signProxyUrl(url);
 };
 
 async function _fetchWikipedia(query: string): Promise<WikiPage | null> {

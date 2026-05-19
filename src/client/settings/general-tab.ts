@@ -111,9 +111,9 @@ export async function initAppearanceSettings(): Promise<void> {
   ) as HTMLInputElement | null;
   if (inlineGifPlayback) {
     const saved = await idbGet<boolean>(INLINE_GIF_PLAYBACK);
-    inlineGifPlayback.checked = saved || false;
+    inlineGifPlayback.checked = saved === false;
     inlineGifPlayback.addEventListener("change", async () => {
-      await idbSet(INLINE_GIF_PLAYBACK, inlineGifPlayback.checked);
+      await idbSet(INLINE_GIF_PLAYBACK, !inlineGifPlayback.checked);
     });
   }
 

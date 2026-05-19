@@ -44,13 +44,13 @@ describe("search", () => {
       expect(out[0].url).toBe("https://a.com");
     });
 
-    test("prefers gif image urls when merging duplicates", () => {
-      const cases = [
-        ["https://cdn.example.com/a.gif", "https://cdn.example.com/a.gif"],
-        ["https://cdn.example.com/a.jpg", "https://cdn.example.com/a.webp"],
+    test("prefers gif imageUrl when merging duplicates and sets isGif", () => {
+      const cases: [string, string, boolean][] = [
+        ["https://cdn.example.com/a.gif", "https://cdn.example.com/a.gif", true],
+        ["https://cdn.example.com/a.jpg", "https://cdn.example.com/a.webp", false],
       ];
 
-      for (const [newImageUrl, expected] of cases) {
+      for (const [newImageUrl, expectedUrl, expectedIsGif] of cases) {
         const existing = [
           scored(
             {
@@ -69,7 +69,8 @@ describe("search", () => {
         ];
 
         const out = mergeNewResults(existing, newResults);
-        expect(out[0].imageUrl).toBe(expected);
+        expect(out[0].imageUrl).toBe(expectedUrl);
+        expect(!!out[0].isGif).toBe(expectedIsGif);
       }
     });
   });

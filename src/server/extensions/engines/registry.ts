@@ -48,6 +48,7 @@ export interface EngineDefinition {
   EngineClass: new () => SearchEngine;
   description?: string;
   disabledByDefault?: boolean;
+  /** @deprecated Legacy outgoing-fetch allowlist. Sign image URLs with ctx.signProxyUrl instead. */
   outgoingHosts?: string[];
   defaultTransport?: string;
 }
@@ -156,6 +157,7 @@ interface PluginEntry {
   description?: string;
   instance: SearchEngine;
   disabledByDefault?: boolean;
+  /** @deprecated Legacy outgoing-fetch allowlist. Sign image URLs with ctx.signProxyUrl instead. */
   outgoingHosts?: string[];
 }
 
@@ -244,6 +246,7 @@ export async function getEffectiveEngineRegistry(): Promise<{
   return [...builtinRegistry, ...plugins];
 }
 
+/** @deprecated Legacy outgoing-fetch allowlist. Sign image URLs with ctx.signProxyUrl instead. */
 export function getOutgoingAllowlist(): string[] {
   const fromBuiltins = BUILTIN_DEFINITIONS.flatMap(
     (d) => d.outgoingHosts ?? [],

@@ -4,6 +4,7 @@ import { getSearchResultTabById } from "../../extensions/search-result-tabs/regi
 import { createSearchEngineContext } from "../../search";
 import type { EngineTiming, ScoredResult } from "../../types";
 import { applyDomainRules } from "./_domain-rules";
+import { signResultThumbnails } from "../../utils/proxy-sign";
 import { logger } from "../../utils/logger";
 import { isDisabled } from "../../utils/plugin-settings";
 import { getClientIp } from "../../utils/request";
@@ -119,7 +120,7 @@ export function registerTabSearchRoute(router: Hono): void {
       }
 
       const totalTime = Math.round(performance.now() - startTime);
-      const finalResults = await applyDomainRules(allResults);
+      const finalResults = signResultThumbnails(await applyDomainRules(allResults));
       return c.json({
         results: finalResults,
         totalPages,

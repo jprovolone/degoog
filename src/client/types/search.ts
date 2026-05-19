@@ -13,6 +13,7 @@ export interface SearchResult {
   source: string;
   thumbnail?: string;
   imageUrl?: string;
+  isGif?: boolean;
   duration?: string;
 }
 

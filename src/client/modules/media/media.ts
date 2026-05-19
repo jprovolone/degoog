@@ -3,11 +3,7 @@ import { getBase } from "../../utils/base-url";
 import type { ScoredResult } from "../../types";
 import { cleanHostname, escapeHtml } from "../../utils/dom";
 import { getEngines } from "../../utils/engines";
-import {
-  buildSearchBody,
-  buildSearchUrl,
-  proxyImageUrl,
-} from "../../utils/url";
+import { buildSearchBody, buildSearchUrl } from "../../utils/url";
 import { openLightbox } from "./lightbox";
 import { searchAuthHeaders, appendSearchAuthParams } from "../../utils/request";
 
@@ -156,7 +152,7 @@ export function openMediaPreview(
 
   if (img) {
     img.style.display = "";
-    img.src = proxyImageUrl(previewSrc) || "";
+    img.src = previewSrc || "";
     img.style.cursor = "zoom-in";
     img.onclick = () => {
       const src = img.src;
@@ -174,7 +170,7 @@ export function openMediaPreview(
     if (isVideo) {
       actions = `<a class="btn btn--primary degoog-btn degoog-btn--primary media-preview-visit" href="${escapeHtml(item.url)}"${target}>Watch video</a>`;
     } else {
-      const downloadUrl = previewSrc ? proxyImageUrl(previewSrc) : "";
+      const downloadUrl = previewSrc || "";
       const downloadFilename = (() => {
         try {
           const p = new URL(previewSrc).pathname;

@@ -6,7 +6,7 @@ import { buildPaginationHtml } from "../../utils/pagination";
 import { goToPage } from "../../utils/search-actions";
 import { renderTemplate } from "../../utils/template";
 import { attachFaviconFallback } from "../../utils/favicon";
-import { faviconHostname, faviconUrl, proxyImageUrl } from "../../utils/url";
+import { faviconHostname, faviconUrl } from "../../utils/url";
 import { destroyMediaObserver, setupMediaObserver } from "../media/media";
 import { renderImageGrid } from "./render-media";
 
@@ -46,7 +46,7 @@ export const buildResultContext = (
     snippet: r.snippet,
     favicon_url: faviconUrl(r.url),
     favicon_host: faviconHostname(r.url),
-    thumbnail_url: r.thumbnail ? proxyImageUrl(r.thumbnail) : "",
+    thumbnail_url: r.thumbnail || "",
     sources: r.sources,
     duration: r.duration || "",
     is_video: state.currentType === "videos" || !!r.duration,

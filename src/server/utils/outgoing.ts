@@ -36,6 +36,7 @@ export function parseOutgoingTransport(raw: string | undefined): string {
 
 let allowedHosts: Set<string> | null = null;
 
+/** @deprecated Legacy outgoing-fetch allowlist. Sign image URLs with ctx.signProxyUrl instead. */
 export function setOutgoingAllowlist(hosts: string[]): void {
   if (!hosts || hosts.length === 0) {
     allowedHosts = new Set();
@@ -72,6 +73,7 @@ function parseProxyUrlsList(rawList: string[]): string[] {
   return out;
 }
 
+/** @deprecated Legacy outgoing-fetch allowlist. Sign image URLs with ctx.signProxyUrl instead. */
 export function isUrlAllowedForOutgoing(url: string): boolean {
   try {
     const parsed = new URL(url);

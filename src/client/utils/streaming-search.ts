@@ -16,7 +16,8 @@ import {
   renderResults,
   renderSidebar,
 } from "../modules/renderer/render";
-import { renderMediaEngineBar } from "../modules/renderer/render-media";
+import { appendMediaCards, renderMediaEngineBar } from "../modules/renderer/render-media";
+import { setupMediaObserver } from "../modules/media/media";
 import { state } from "../state";
 import {
   EngineTiming,
@@ -162,6 +163,7 @@ export async function performStreamingSearch(
   let firstResult = true;
   let currentResults: ScoredResult[] = [];
   const renderedUrls = new Set<string>();
+  const renderedImages: ScoredResult[] = [];
 
   const source = new EventSource(streamUrl);
   _activeSource = source;
@@ -184,17 +186,33 @@ export async function performStreamingSearch(
       engineTimings.push(data.timing);
     }
 
-    currentResults = data.results;
-    state.currentResults = currentResults;
-
-    if (firstResult) {
-      firstResult = false;
-      if (resultsList) resultsList.innerHTML = "";
-    }
-
     if (isImageType) {
-      renderResults(currentResults);
+      if (firstResult) {
+        firstResult = false;
+        if (resultsList) {
+          resultsList.innerHTML =
+            '<div class="image-grid"></div><div class="media-scroll-sentinel"></div>';
+        }
+      }
+      const grid = resultsList?.querySelector<HTMLElement>(".image-grid");
+      const fresh: ScoredResult[] = [];
+      for (const r of data.results) {
+        if (!renderedUrls.has(r.url)) {
+          renderedUrls.add(r.url);
+          fresh.push(r);
+          renderedImages.push(r);
+        }
+      }
+      currentResults = renderedImages;
+      state.currentResults = renderedImages;
+      if (grid && fresh.length) appendMediaCards(grid, fresh, "image");
     } else {
+      currentResults = data.results;
+      state.currentResults = currentResults;
+      if (firstResult) {
+        firstResult = false;
+        if (resultsList) resultsList.innerHTML = "";
+      }
       updateResults(resultsList, currentResults, renderedUrls);
       if (resultsList) attachVideoPlayers(resultsList);
     }
@@ -244,6 +262,7 @@ export async function performStreamingSearch(
     if (isImageType) {
       renderMediaEngineBar(data.engineTimings);
       if (sidebar) sidebar.innerHTML = "";
+      if (currentResults.length > 0) setupMediaObserver("images");
     } else if (type === "web") {
       void fetchGlancePanels(query, currentResults);
       void fetchSlotPanels(query, currentResults).then((panels) => {
@@ -266,7 +285,7 @@ export async function performStreamingSearch(
     }
 
     if (resultsList) attachVideoPlayers(resultsList);
-    renderPagination(MAX_PAGE, state.currentPage);
+    if (!isImageType) renderPagination(MAX_PAGE, state.currentPage);
   });
 
   source.addEventListener("error", (e) => {

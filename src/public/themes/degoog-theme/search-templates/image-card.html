@@ -2,9 +2,10 @@
   <img
     class="image-thumb"
     src="{{ thumbnail_url }}"
+    data-fallback="{{ fallback_url }}"
     alt="{{ title }}"
     loading="lazy"
-    onerror="this.parentElement.parentElement.style.display='none'"
+    onerror="this.src!==this.dataset.fallback?(this.src=this.dataset.fallback):this.closest('.image-card').style.display='none'"
   />
 </div>
 <div class="image-info">
