@@ -127,7 +127,7 @@ export async function initPlugins(): Promise<void> {
   await registry.init();
 }
 
-export async function reloadCommands(bust = true): Promise<void> {
+export async function reloadCommands(bust = false): Promise<void> {
   await loadAliases();
   commandSourceMap.clear();
   await (bust ? registry.reload() : registry.refresh());
