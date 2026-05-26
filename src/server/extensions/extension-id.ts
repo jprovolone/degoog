@@ -8,6 +8,7 @@ export type ExtensionKind =
   | "command"
   | "engine"
   | "theme"
+  | "autocomplete"
   | "uovadipasqua";
 
 const _shortHash = (input: string): string =>

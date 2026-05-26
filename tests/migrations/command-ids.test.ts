@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { runCommandIds052027 } from "../../src/server/migrations/2026-05-command-ids";
-import type { ReposData } from "../../src/server/types";
+import { ExtensionStoreType, type ReposData } from "../../src/server/types";
 
 type MigrationResult = {
   settings: Record<string, unknown>;
@@ -82,7 +82,7 @@ describe("command-ids migration", () => {
         installed: [
           {
             repoUrl: "https://github.com/degoog-org/official-extensions.git",
-            type: "plugin",
+            type: ExtensionStoreType.Plugin,
             itemPath: "plugins/jellyfin",
             installedAs: "jellyfin",
             installedAt: "2026-03-11T22:52:45.011Z",
@@ -90,7 +90,7 @@ describe("command-ids migration", () => {
           },
           {
             repoUrl: "https://github.com/degoog-org/official-extensions.git",
-            type: "engine",
+            type: ExtensionStoreType.Engine,
             itemPath: "engines/lemmy",
             installedAs: "lemmy",
             installedAt: "2026-03-13T17:06:50.206Z",
@@ -115,7 +115,7 @@ describe("command-ids migration", () => {
         installed: [
           {
             repoUrl: "https://github.com/degoog-org/official-extensions.git",
-            type: "plugin",
+            type: ExtensionStoreType.Plugin,
             itemPath: "plugins/meilisearch",
             installedAs: "meilisearch",
             installedAt: "2026-03-11T22:52:47.506Z",

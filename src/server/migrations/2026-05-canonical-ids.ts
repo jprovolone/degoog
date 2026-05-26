@@ -55,8 +55,8 @@ const OFFICIAL_STORE_OVERRIDES: Record<string, string> = {
   "ai-summary": "degoog-org-official-extensions-ai-summary-slot",
   "ai-summary-slot": "degoog-org-official-extensions-ai-summary-slot",
   "apps-pocket": "degoog-org-official-extensions-apps-pocket-command",
-  "autocomplete-builtin-duckduckgo": "autocomplete-degoog-org-official-extensions-duckduckgo",
-  "autocomplete-builtin-google": "autocomplete-degoog-org-official-extensions-google",
+  "autocomplete-builtin-duckduckgo": "degoog-org-official-extensions-duckduckgo-autocomplete",
+  "autocomplete-builtin-google": "degoog-org-official-extensions-google-autocomplete",
   bing: "degoog-org-official-extensions-bing-engine",
   "bing-engine": "degoog-org-official-extensions-bing-engine",
   "bing-images": "degoog-org-official-extensions-bing-images-engine",
@@ -121,7 +121,7 @@ const OFFICIAL_STORE_OVERRIDES: Record<string, string> = {
   "wikimedia-commons": "degoog-org-official-extensions-wikimedia-commons-engine",
   wikipedia: "degoog-org-official-extensions-wikipedia-engine",
   "wikipedia-engine": "degoog-org-official-extensions-wikipedia-engine",
-  yahoo: "autocomplete-degoog-org-official-extensions-yahoo",
+  yahoo: "degoog-org-official-extensions-yahoo-autocomplete",
   zen: "degoog-org-official-extensions-zen-theme",
 };
 
@@ -281,17 +281,17 @@ const _collectInstalledMappings = async (): Promise<BuiltinMappings> => {
     addCandidate(`engine-${folder}`, id);
   }
   for (const folder of await _listDirs(autocompleteDir())) {
-    const id = `autocomplete-${folder}`;
+    const id = makeExtID(folder, "autocomplete");
     canonicals.add(id);
     addCandidate(folder, id);
+    addCandidate(`autocomplete-${folder}`, id);
   }
   for (const folder of await _listDirs(transportsDir())) {
     const canonical = makeExtID(folder, "transport");
-    const settingsId = `transport-${canonical}`;
-    canonicals.add(settingsId);
     canonicals.add(canonical);
-    addCandidate(`transport-${folder}`, settingsId);
-    addCandidate(folder, settingsId);
+    addCandidate(`transport-${folder}`, canonical);
+    addCandidate(`transport-${canonical}`, canonical);
+    addCandidate(folder, canonical);
   }
   for (const folder of await _listDirs(pluginsDir())) {
     const cmdId = makeExtID(folder, "command");
@@ -373,23 +373,26 @@ const _collectRepoMappings = async (
         const itemFolder = ent.path.split("/").filter(Boolean).pop() ?? "";
         if (!itemFolder) continue;
         const folder = `${local}-${itemFolder}`;
-        const runtimeId = `autocomplete-${folder}`;
-        canonicals.add(runtimeId);
+        const canonicalId = makeExtID(folder, "autocomplete");
+        canonicals.add(canonicalId);
 
         const candidates = new Set<string>([
           `autocomplete-${itemFolder}`,
           `autocomplete-builtin-${itemFolder}`,
+          `autocomplete-${folder}`,
           itemFolder,
+          makeExtID(itemFolder, "autocomplete"),
+          folder,
         ]);
         if (Array.isArray(ent.legacyIds)) {
           for (const l of ent.legacyIds) {
             if (typeof l === "string" && l.trim()) candidates.add(l.trim());
           }
         }
-        candidates.delete(runtimeId);
+        candidates.delete(canonicalId);
         for (const c of candidates) {
           const existing = map.get(c) ?? [];
-          if (!existing.includes(runtimeId)) existing.push(runtimeId);
+          if (!existing.includes(canonicalId)) existing.push(canonicalId);
           map.set(c, existing);
         }
       }

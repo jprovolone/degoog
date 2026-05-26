@@ -67,7 +67,7 @@ export const STORE_TYPE_SPECS: Record<ExtensionStoreType, StoreTypeSpec> = {
     destDir: themesDir,
     manifestKey: "themes",
     reload: () => reloadThemes(),
-    settingsIds: (id) => [`theme-${makeExtID(id, "theme")}`],
+    settingsIds: (id) => [makeExtID(id, "theme")],
   },
   [ExtensionStoreType.Engine]: {
     destDir: enginesDir,
@@ -79,12 +79,12 @@ export const STORE_TYPE_SPECS: Record<ExtensionStoreType, StoreTypeSpec> = {
     destDir: transportsDir,
     manifestKey: "transports",
     reload: () => reloadTransports(),
-    settingsIds: (id) => [`transport-${makeExtID(id, "transport")}`],
+    settingsIds: (id) => [makeExtID(id, "transport")],
   },
   [ExtensionStoreType.Autocomplete]: {
     destDir: autocompleteDir,
     manifestKey: "autocomplete",
     reload: () => reloadAutocomplete(),
-    settingsIds: (id) => [`autocomplete-${id}`],
+    settingsIds: (id) => [makeExtID(id, "autocomplete")],
   },
 };

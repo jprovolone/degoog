@@ -16,6 +16,7 @@ import { autocompleteDir } from "../../utils/paths";
 import { autocompleteCache } from "../../utils/cache";
 import { getTransportNames, getTransportDisplayNames } from "../transports/registry";
 import { createRegistry } from "../registry-factory";
+import { makeExtID } from "../extension-id";
 import { logger } from "../../utils/logger";
 import { signSuggestionThumbnails } from "../../utils/proxy-sign";
 import { buildProviderContext } from "./context";
@@ -51,7 +52,7 @@ const pluginRegistry = createRegistry<PluginEntry>({
     return { id: "", displayName: instance.name, instance };
   },
   onLoad: async (entry, { folderName }) => {
-    entry.id = `autocomplete-${folderName}`;
+    entry.id = makeExtID(folderName, "autocomplete");
     const stored = await getSettings(entry.id);
     if (entry.instance.configure && entry.instance.settingsSchema?.length) {
       entry.instance.configure(

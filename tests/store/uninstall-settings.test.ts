@@ -9,25 +9,28 @@ describe("settingsIdsForInstalled", () => {
     expect(ids).not.toContain("engine-acme-foo");
   });
 
-  test("transport uses transport-<canonical> form", () => {
+  test("transport uses canonical -transport suffix, not transport- prefix", () => {
     const ids = settingsIdsForInstalled(
       ExtensionStoreType.Transport,
       "acme-bar",
     );
-    expect(ids).toContain("transport-acme-bar-transport");
+    expect(ids).toContain("acme-bar-transport");
+    expect(ids).not.toContain("transport-acme-bar-transport");
   });
 
-  test("theme uses theme-<canonical> form", () => {
+  test("theme uses canonical -theme suffix, not theme- prefix", () => {
     const ids = settingsIdsForInstalled(ExtensionStoreType.Theme, "acme-zen");
-    expect(ids).toContain("theme-acme-zen-theme");
+    expect(ids).toContain("acme-zen-theme");
+    expect(ids).not.toContain("theme-acme-zen-theme");
   });
 
-  test("autocomplete uses autocomplete- prefix", () => {
+  test("autocomplete uses canonical -autocomplete suffix, not autocomplete- prefix", () => {
     const ids = settingsIdsForInstalled(
       ExtensionStoreType.Autocomplete,
       "acme-ac",
     );
-    expect(ids).toContain("autocomplete-acme-ac");
+    expect(ids).toContain("acme-ac-autocomplete");
+    expect(ids).not.toContain("autocomplete-acme-ac");
   });
 
   test("plugin command uses canonical -command suffix, not plugin- prefix", () => {

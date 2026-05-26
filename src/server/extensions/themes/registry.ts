@@ -47,6 +47,7 @@ export interface LoadedTheme {
 import { themesDir } from "../../utils/paths";
 import { bootCircuitFromPath } from "../../utils/translation-circuit";
 import { buildExtensionMeta } from "../extension-meta";
+import { makeExtID } from "../extension-id";
 import { rewriteThemePaths } from "../../utils/extension-id";
 
 const THEMES_DIR = themesDir();
@@ -54,8 +55,8 @@ const THEMES_DIR = themesDir();
 let themes: LoadedTheme[] = [];
 let activeThemeId: string | null = null;
 
-function settingsId(themeId: string): string {
-  return `theme-${themeId}`;
+export function getThemeSettingsId(themeId: string): string {
+  return makeExtID(themeId, "theme");
 }
 
 async function compileThemeCss(
@@ -188,7 +189,7 @@ export async function getThemeExtensionMeta(): Promise<ExtensionMeta[]> {
 
   for (const theme of themes) {
     const schema = theme.manifest.settingsSchema ?? [];
-    const id = settingsId(theme.id);
+    const id = getThemeSettingsId(theme.id);
     results.push(
       await buildExtensionMeta({
         id,
@@ -212,7 +213,7 @@ export async function getActiveThemeDataAttrs(): Promise<string> {
   ) {
     return "";
   }
-  const stored = await getSettings(settingsId(theme.id));
+  const stored = await getSettings(getThemeSettingsId(theme.id));
   const parts: string[] = [];
   for (const [settingKey, attrSuffix] of Object.entries(
     theme.manifest.dataAttrsFromSettings,

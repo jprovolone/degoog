@@ -1,10 +1,14 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { makeExtID } from "../../src/server/extensions/extension-id";
 import {
   getSlotPluginById,
   getSlotPlugins,
   initSlotPlugins,
 } from "../../src/server/extensions/slots/registry";
 import { SlotPanelPosition } from "../../src/server/types";
+
+const AT_A_GLANCE_ID = makeExtID("at-a-glance", "slot");
+const WIKIPEDIA_ID = makeExtID("wikipedia", "slot");
 
 describe("slots registry", () => {
   const origFetch = globalThis.fetch;
@@ -33,27 +37,27 @@ describe("slots registry", () => {
   });
 
   test("built-in at-a-glance slot has position at-a-glance and waitForResults", () => {
-    const slot = getSlotPluginById("at-a-glance-slot");
+    const slot = getSlotPluginById(AT_A_GLANCE_ID);
     expect(slot).not.toBeNull();
     expect(slot!.position).toBe(SlotPanelPosition.AtAGlance);
     expect(slot!.waitForResults).toBe(true);
   });
 
   test("built-in wikipedia slot has position knowledge-panel", () => {
-    const slot = getSlotPluginById("wikipedia-slot");
+    const slot = getSlotPluginById(WIKIPEDIA_ID);
     expect(slot).not.toBeNull();
     expect(slot!.position).toBe(SlotPanelPosition.KnowledgePanel);
   });
 
   test("built-in wikipedia slot trigger returns false for very short queries", async () => {
-    const slot = getSlotPluginById("wikipedia-slot");
+    const slot = getSlotPluginById(WIKIPEDIA_ID);
     expect(slot).not.toBeNull();
     const result = await slot!.trigger("x");
     expect(result).toBe(false);
   });
 
   test("built-in wikipedia slot execute returns empty html when no page cached", async () => {
-    const slot = getSlotPluginById("wikipedia-slot");
+    const slot = getSlotPluginById(WIKIPEDIA_ID);
     expect(slot).not.toBeNull();
     const result = await slot!.execute("__nonexistent_query_xyz__");
     expect(result.html).toBe("");

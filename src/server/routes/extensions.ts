@@ -158,12 +158,12 @@ router.get("/api/extensions", async (c) => {
               makeExtID(i.installedAs, "tab"),
             ]
           : i.type === ExtensionStoreType.Theme
-            ? [`theme-${makeExtID(i.installedAs, "theme")}`]
+            ? [makeExtID(i.installedAs, "theme")]
             : i.type === ExtensionStoreType.Engine
               ? [makeExtID(i.installedAs, "engine")]
               : i.type === ExtensionStoreType.Autocomplete
-                ? [`autocomplete-${i.installedAs}`]
-                : [`transport-${makeExtID(i.installedAs, "transport")}`];
+                ? [makeExtID(i.installedAs, "autocomplete")]
+                : [makeExtID(i.installedAs, "transport")];
       return expected.includes(meta.id);
     });
     if (inst?.minDegoogVersion) {
@@ -314,13 +314,12 @@ router.post("/api/extensions/:id/settings", async (c) => {
     }
   }
 
-  if (id.startsWith("transport-")) {
-    const transportName = id.slice(10);
-    const transportInstance = getTransport(transportName);
+  if (id.endsWith("-transport")) {
+    const transportInstance = getTransport(id);
     if (transportInstance?.configure) transportInstance.configure(merged);
   }
 
-  if (id.startsWith("autocomplete-")) {
+  if (id.endsWith("-autocomplete")) {
     const providerInstance = getAutocompleteProviderById(id);
     if (providerInstance?.configure) providerInstance.configure(merged);
   }

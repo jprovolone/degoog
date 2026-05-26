@@ -17,12 +17,15 @@ import { looksLikeProse, stripSnippetPrefix } from "../../../../utils/text";
 import { getRandomUserAgent } from "../../../../utils/user-agents";
 
 const SETTINGS_ID = "slot-at-a-glance";
-const WIKIPEDIA_SETTINGS_ID = "slot-wikipedia";
+const WIKIPEDIA_SETTINGS_ID = "wikipedia-slot";
 const WIKIPEDIA_HOSTNAME = "wikipedia.org";
 
 const EXTRACT_NAMESPACE = "ext:at-a-glance:extract";
 const EXTRACT_TTL_MS = 60 * 60 * 1000;
-let _extractCache: AsyncTtlCache<string> = useCache<string>(EXTRACT_NAMESPACE, EXTRACT_TTL_MS);
+let _extractCache: AsyncTtlCache<string> = useCache<string>(
+  EXTRACT_NAMESPACE,
+  EXTRACT_TTL_MS,
+);
 
 const _escapeHtml = (s: string): string =>
   s
@@ -35,7 +38,9 @@ const _escapeHtml = (s: string): string =>
 const _isWikipediaUrl = (url: string): boolean => {
   try {
     const host = new URL(url).hostname.toLowerCase();
-    return host === WIKIPEDIA_HOSTNAME || host.endsWith(`.${WIKIPEDIA_HOSTNAME}`);
+    return (
+      host === WIKIPEDIA_HOSTNAME || host.endsWith(`.${WIKIPEDIA_HOSTNAME}`)
+    );
   } catch {
     return false;
   }
@@ -61,7 +66,8 @@ const _pickBestResult = (
     : results;
   if (candidates.length === 0) return null;
   return candidates.reduce((best, r) =>
-    _scoreSnippet(r.snippet, queryTerms) > _scoreSnippet(best.snippet, queryTerms)
+    _scoreSnippet(r.snippet, queryTerms) >
+    _scoreSnippet(best.snippet, queryTerms)
       ? r
       : best,
   );

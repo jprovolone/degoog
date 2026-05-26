@@ -5,6 +5,7 @@ import { runServerSettingsExtract052026 } from "./2026-05-server-settings-extrac
 import { runCanonicalIds052026 } from "./2026-05-canonical-ids";
 import { runCommandIds052027 } from "./2026-05-command-ids";
 import { runBuiltinMigrations052026 } from "./2026-05-builtin-migrations";
+import { runThemeTransportIds052028 } from "./2026-05-theme-transport-ids";
 
 /**
  * Self-contained migrations live in this directory.
@@ -42,6 +43,11 @@ export const runMigrations = async (): Promise<void> => {
     await runCommandIds052027();
   } catch (err) {
     logger.error("migrations", "command-ids failed", err);
+  }
+  try {
+    await runThemeTransportIds052028();
+  } catch (err) {
+    logger.error("migrations", "theme-transport-ids failed", err);
   }
   try {
     await runBuiltinMigrations052026();

@@ -19,6 +19,7 @@ import {
 import { addRepo } from "./repo-ops";
 import { STORE_TYPE_SPECS } from "./store-types";
 import { createMutex } from "../../utils/mutex";
+import { makeExtID } from "../extension-id";
 
 const _storeMutex = createMutex();
 
@@ -87,6 +88,16 @@ async function copyItemDir(
 
 function getDestDir(type: ExtensionStoreType): string {
   return STORE_TYPE_SPECS[type].destDir();
+}
+
+function canonicalInstalledFolder(
+  type: ExtensionStoreType,
+  folderName: string,
+): string {
+  if (type === ExtensionStoreType.Theme) return makeExtID(folderName, "theme");
+  if (type === ExtensionStoreType.Autocomplete)
+    return makeExtID(folderName, "autocomplete");
+  return folderName;
 }
 
 export function settingsIdsForInstalled(
@@ -339,7 +350,10 @@ async function _installItem(
     const freshData = await readReposData();
     const itemFolder = normalizedPath.split("/").pop() ?? normalizedPath;
     const { author, name } = repoAuthorAndName(repo.url);
-    const folderName = `${author}-${name}-${slugifyIdPart(itemFolder)}`;
+    const folderName = canonicalInstalledFolder(
+      type,
+      `${author}-${name}-${slugifyIdPart(itemFolder)}`,
+    );
     const destBase = getDestDir(type);
     await mkdir(destBase, { recursive: true });
     const destDir = join(destBase, folderName);

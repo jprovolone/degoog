@@ -45,9 +45,9 @@ const registry = createRegistry<Transport>({
     const name = canonicalId ?? folderName;
     if (_builtins.some((t) => t.name === name)) return false;
     instance.name = name;
-    registerExtensionFolder(`transport-${name}`, folderName);
+    registerExtensionFolder(name, folderName);
     if (instance.configure) {
-      const stored = await getSettings(`transport-${name}`);
+      const stored = await getSettings(name);
       if (Object.keys(stored).length > 0) instance.configure(stored);
     }
   },
@@ -86,13 +86,14 @@ export function resolveTransport(name: string | undefined): Transport {
   return getTransport(name) ?? getFallbackTransport();
 }
 
-const _settingsId = (t: Transport): string => `transport-${t.name}`;
+export const getTransportSettingsId = (t: Pick<Transport, "name">): string =>
+  t.name;
 
 export async function getTransportExtensionMeta(): Promise<ExtensionMeta[]> {
   const results: ExtensionMeta[] = [];
   for (const t of _all()) {
     const schema = t.settingsSchema ?? [];
-    const id = _settingsId(t);
+    const id = getTransportSettingsId(t);
     results.push(
       await buildExtensionMeta({
         id,

@@ -205,8 +205,8 @@ export function openModal(ext: ExtensionMeta): void {
           .join("")}</div>
       </div>`;
     }
-    if (ext.id.startsWith("transport-") && ext.configurable) {
-      const transportName = ext.id.slice(10);
+    if (ext.id.endsWith("-transport") && ext.configurable) {
+      const transportName = ext.id;
       html += `<div class="ext-test-connection">
         <button type="button" class="ext-test-btn" data-transport="${transportName}">${t("settings-page.modal.test-connection")}</button>
         <span class="ext-test-result"></span>
