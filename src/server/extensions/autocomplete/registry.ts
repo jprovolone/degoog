@@ -238,10 +238,10 @@ export async function getAutocompleteExtensionMeta(): Promise<ExtensionMeta[]> {
   return results;
 }
 
-export async function initAutocomplete(): Promise<void> {
-  await pluginRegistry.init();
+export async function initAutocomplete(bust = false): Promise<void> {
+  await (bust ? pluginRegistry.reload() : pluginRegistry.init());
 }
 
-export async function reloadAutocomplete(): Promise<void> {
-  await initAutocomplete();
+export async function reloadAutocomplete(bust = true): Promise<void> {
+  await initAutocomplete(bust);
 }

@@ -108,10 +108,10 @@ export async function getTransportExtensionMeta(): Promise<ExtensionMeta[]> {
   return results;
 }
 
-export async function initTransports(): Promise<void> {
-  await registry.init();
+export async function initTransports(bust = false): Promise<void> {
+  await (bust ? registry.reload() : registry.init());
 }
 
-export async function reloadTransports(): Promise<void> {
-  await initTransports();
+export async function reloadTransports(bust = true): Promise<void> {
+  await initTransports(bust);
 }

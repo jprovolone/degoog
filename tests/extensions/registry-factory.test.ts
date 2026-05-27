@@ -2,7 +2,7 @@ import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { mkdtemp, writeFile, rm } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
-import { createRegistry } from "../../src/server/extensions/registry-factory";
+import { createRegistry, bumpPluginRegistryReload, getPluginRegistryReloadGeneration } from "../../src/server/extensions/registry-factory";
 
 interface Widget {
   id: string;
@@ -53,5 +53,11 @@ describe("registry-factory onLoad contract", () => {
     await reg.init();
     const ids = reg.items().map((w) => w.id);
     expect(ids).toEqual(["alpha"]);
+  });
+
+  test("bumpPluginRegistryReload increments import cache generation", () => {
+    const before = getPluginRegistryReloadGeneration();
+    bumpPluginRegistryReload();
+    expect(getPluginRegistryReloadGeneration()).toBe(before + 1);
   });
 });

@@ -17,7 +17,6 @@ import {
   clearPluginRoutes,
   initPluginRoutes,
 } from "../plugin-routes/registry";
-import { bumpPluginRegistryReload } from "../registry-factory";
 import { reloadMiddlewareRegistry } from "../middleware/registry";
 import { reloadThemes } from "../themes/registry";
 import { reloadEngines } from "../engines/registry";
@@ -39,7 +38,6 @@ interface StoreTypeSpec {
 }
 
 const reloadPluginBundle = async (bust: boolean): Promise<void> => {
-  if (bust) bumpPluginRegistryReload();
   clearPluginRoutes();
   await reloadSlotPlugins(bust);
   await reloadInterceptors(bust);
@@ -66,25 +64,25 @@ export const STORE_TYPE_SPECS: Record<ExtensionStoreType, StoreTypeSpec> = {
   [ExtensionStoreType.Theme]: {
     destDir: themesDir,
     manifestKey: "themes",
-    reload: () => reloadThemes(),
+    reload: reloadThemes,
     settingsIds: (id) => [makeExtID(id, "theme")],
   },
   [ExtensionStoreType.Engine]: {
     destDir: enginesDir,
     manifestKey: "engines",
-    reload: () => reloadEngines(),
+    reload: reloadEngines,
     settingsIds: (id) => [makeExtID(id, "engine")],
   },
   [ExtensionStoreType.Transport]: {
     destDir: transportsDir,
     manifestKey: "transports",
-    reload: () => reloadTransports(),
+    reload: reloadTransports,
     settingsIds: (id) => [makeExtID(id, "transport")],
   },
   [ExtensionStoreType.Autocomplete]: {
     destDir: autocompleteDir,
     manifestKey: "autocomplete",
-    reload: () => reloadAutocomplete(),
+    reload: reloadAutocomplete,
     settingsIds: (id) => [makeExtID(id, "autocomplete")],
   },
 };

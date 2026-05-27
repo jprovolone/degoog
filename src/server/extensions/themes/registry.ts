@@ -264,7 +264,7 @@ export async function recompileTheme(id: string): Promise<void> {
   }
 }
 
-export async function reloadThemes(): Promise<void> {
+export async function reloadThemes(_bust = true): Promise<void> {
   themes = [];
   activeThemeId = null;
   await initThemes();

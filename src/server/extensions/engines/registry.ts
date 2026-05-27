@@ -455,12 +455,12 @@ export const getEngineExtensionMeta = async (
   return results;
 };
 
-export const initEngines = async (): Promise<void> => {
-  await engineRegistry.init();
+export const initEngines = async (bust = false): Promise<void> => {
+  await (bust ? engineRegistry.reload() : engineRegistry.init());
 };
 
-export const reloadEngines = async (): Promise<void> => {
-  await initEngines();
+export const reloadEngines = async (bust = true): Promise<void> => {
+  await initEngines(bust);
 };
 
 export const getAllEngineTranslators = (): {

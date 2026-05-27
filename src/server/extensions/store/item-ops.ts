@@ -18,6 +18,7 @@ import {
 } from "./persistence";
 import { addRepo } from "./repo-ops";
 import { STORE_TYPE_SPECS } from "./store-types";
+import { bumpPluginRegistryReload } from "../registry-factory";
 import { createMutex } from "../../utils/mutex";
 import { makeExtID } from "../extension-id";
 
@@ -128,6 +129,7 @@ export async function reloadAfterAction(
   type: ExtensionStoreType,
   bust = true,
 ): Promise<void> {
+  if (bust) bumpPluginRegistryReload();
   await STORE_TYPE_SPECS[type].reload(bust);
 }
 
