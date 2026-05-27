@@ -31,6 +31,7 @@ export interface StoreItem {
   updateAvailable?: boolean;
   pluginType?: string;
   engineType?: string;
+  engineTypes?: string[];
   minDegoogVersion?: string;
   requiresNewerVersion?: boolean;
 }

@@ -16,16 +16,42 @@ const _typeLabel = (type: string): string => {
     : type.charAt(0).toUpperCase() + type.slice(1);
 };
 
+const _engineTypes = (engine: ExtensionMeta): string[] => {
+  if (engine.searchTypes?.length) return engine.searchTypes;
+  return [engine.primaryType ?? "web"];
+};
+
+const _primaryType = (types: string[]): string =>
+  types.length > 0 ? types[0] : "web";
+
 const _groupByType = (
   engines: ExtensionMeta[],
-): Record<string, ExtensionMeta[]> => {
-  const groups: Record<string, ExtensionMeta[]> = {};
+): { key: string; label: string; engines: ExtensionMeta[] }[] => {
+  const map = new Map<string, ExtensionMeta[]>();
   for (const engine of engines) {
-    const label = _typeLabel((engine.searchType ?? "web").toLowerCase());
-    if (!groups[label]) groups[label] = [];
-    groups[label].push(engine);
+    const key = _primaryType(_engineTypes(engine)).toLowerCase();
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(engine);
   }
-  return groups;
+  return [...map.keys()]
+    .sort((a, b) => {
+      if (a === "web") return -1;
+      if (b === "web") return 1;
+      return a.localeCompare(b);
+    })
+    .map((key) => ({
+      key,
+      label: _typeLabel(key),
+      engines: map.get(key) ?? [],
+    }));
+};
+
+const _extraTypeLabels = (engine: ExtensionMeta): string[] => {
+  const types = _engineTypes(engine);
+  const primary = _primaryType(types).toLowerCase();
+  return types
+    .filter((type) => type.toLowerCase() !== primary)
+    .map((type) => _typeLabel(type.toLowerCase()));
 };
 
 const _renderEngineCard = (
@@ -38,7 +64,11 @@ const _renderEngineCard = (
     ? `<span class="ext-card-desc">${renderMdInline(engine.description)}</span>`
     : "";
   const versionWarning = engine.requiresNewerVersion
-    ? `<span class="ext-version-warning">Requires a newer version of Degoog</span>`
+    ? `<span class="ext-version-warning">${escapeHtml(t("settings-page.extensions.requires-newer-version"))}</span>`
+    : "";
+  const extraTypes = _extraTypeLabels(engine);
+  const extraTypesHtml = extraTypes.length
+    ? `<div class="ext-card-extra-types"><span class="ext-card-extra-types-label">${escapeHtml(t("settings-page.extensions.extra-types"))}</span>${extraTypes.map((label) => `<span class="degoog-badge degoog-badge--engine-type">${escapeHtml(label)}</span>`).join("")}</div>`
     : "";
   const status =
     allowConfigure && engine.configurable ? getConfigStatus(engine) : null;
@@ -58,6 +88,7 @@ const _renderEngineCard = (
         <div class="ext-card-info">
           <label for="engine-toggle-${escapeHtml(engine.id)}" class="ext-card-name engine-toggle-label">${escapeHtml(engine.displayName)}</label>
           ${desc}
+          ${extraTypesHtml}
           ${versionWarning}
         </div>
         <div class="ext-card-actions">
@@ -92,7 +123,7 @@ export async function initEnginesTab(
 
   const groups = _groupByType(allExtensions.engines);
   let html = "";
-  for (const [label, engines] of Object.entries(groups)) {
+  for (const { label, engines } of groups) {
     html += `<div class="ext-group"><h3 class="ext-group-label">${escapeHtml(label)}</h3><div class="ext-cards">`;
     for (const engine of engines) {
       html += _renderEngineCard(engine, enabledMap, allowConfigure);

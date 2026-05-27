@@ -27,7 +27,8 @@ export interface ExtensionMeta {
   id: string;
   displayName: string;
   description: string;
-  searchType?: string;
+  primaryType?: string;
+  searchTypes?: string[];
   type: string;
   trigger?: string;
   configurable: boolean;
@@ -67,6 +68,12 @@ export interface Command {
 }
 
 export interface EngineRegistry {
-  engines: Array<{ id: string; displayName: string; searchType?: string }>;
+  engines: Array<{
+    id: string;
+    displayName: string;
+    primaryType: string;
+    searchTypes: string[];
+    disabledByDefault?: boolean;
+  }>;
   defaults?: Record<string, boolean>;
 }

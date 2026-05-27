@@ -1,4 +1,4 @@
-import { getEngineRegistry } from "../../extensions/engines/registry";
+import { listEngineIds } from "../../extensions/engines/registry";
 import type { EngineConfig, ImageFilter, ImgColor, ImgLayout, ImgNsfw, ImgSize, ImgType } from "../../types";
 
 export function parsePage(raw: unknown): number {
@@ -6,10 +6,9 @@ export function parsePage(raw: unknown): number {
 }
 
 export function parseEnginesFromBody(enabledList?: string[]): EngineConfig {
-  const registry = getEngineRegistry();
   const enabledSet = enabledList ? new Set(enabledList) : null;
   const engines: EngineConfig = {};
-  for (const { id } of registry) {
+  for (const id of listEngineIds()) {
     engines[id] = enabledSet ? enabledSet.has(id) : true;
   }
   return engines;

@@ -2,7 +2,7 @@ import { Context, Hono } from "hono";
 import { SETTINGS_TABS } from "../../shared/settings-tabs";
 import {
   getDefaultEngineConfig,
-  getEffectiveEngineRegistry,
+  listEngines,
 } from "../extensions/engines/registry";
 import { getThemeHtml } from "../extensions/themes/registry";
 import * as cache from "../utils/cache";
@@ -198,7 +198,7 @@ for (const ap of _adminPaths) {
 
 router.get("/api/engines", async (c) => {
   return c.json({
-    engines: await getEffectiveEngineRegistry(),
+    engines: await listEngines(),
     defaults: getDefaultEngineConfig(),
   });
 });

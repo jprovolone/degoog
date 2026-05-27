@@ -12,7 +12,7 @@ const _renderTransportCard = (transport: ExtensionMeta): string => {
     ? `<span class="ext-card-desc">${renderMdInline(transport.description)}</span>`
     : "";
   const versionWarning = transport.requiresNewerVersion
-    ? `<span class="ext-version-warning">Requires a newer version of Degoog</span>`
+    ? `<span class="ext-version-warning">${escapeHtml(t("settings-page.extensions.requires-newer-version"))}</span>`
     : "";
   const status = transport.configurable ? getConfigStatus(transport) : null;
   const badge =

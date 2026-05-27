@@ -208,7 +208,9 @@
       "exposure-safe": "Le richieste del browser passano per il server",
       "exposure-unknown": "Comportamento di rete non dichiarato",
       "status-configured": "Configurato",
-      "status-needs-config": "Configurazione necessaria"
+      "status-needs-config": "Configurazione necessaria",
+      "extra-types": "Tipi aggiuntivi:",
+      "requires-newer-version": "Richiede una versione più recente di Degoog"
     },
     "errors": {
       "load-extensions": "Impossibile caricare le estensioni.",

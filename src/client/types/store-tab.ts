@@ -23,5 +23,6 @@ export interface StoreItem {
   author?: { name: string; url?: string };
   pluginType?: string;
   engineType?: string;
+  engineTypes?: string[];
   requiresNewerVersion?: boolean;
 }

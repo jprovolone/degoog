@@ -4,6 +4,8 @@ import type { RepoInfo, StoreItem } from "../../types/store-tab";
 import { getBase } from "../../utils/base-url";
 import { renderMdInline } from "../../utils/md";
 
+const t = window.scopedT("core");
+
 const OFFICIAL_REPO_URL =
   "https://github.com/degoog-org/official-extensions.git";
 
@@ -192,7 +194,7 @@ export function renderItemCard(
           <div class="store-card-meta">by ${author || "-"} · ${escapeHtml(item.repoName)}</div>
           <div class="store-card-desc">${renderMdInline(item.description || "")}</div>
           <div class="store-card-version">${item.updateAvailable ? `<span class="store-card-version-old">v${escapeHtml(item.installedVersion || "?")}</span> → ` : ""}v${escapeHtml(item.version)}</div>
-          ${item.requiresNewerVersion ? `<div class="store-card-version-warning">Requires a newer version of Degoog</div>` : ""}
+          ${item.requiresNewerVersion ? `<div class="store-card-version-warning">${escapeHtml(t("settings-page.extensions.requires-newer-version"))}</div>` : ""}
         </div>
         <div class="store-card-footer">
           <span class="store-type-badge store-type-${item.type} degoog-badge degoog-badge--store-type">${typeLabel}</span>
@@ -221,7 +223,10 @@ export function filterItems(
   if (subtypeFilter && subtypeFilter !== "all") {
     out = out.filter((i) => {
       if (i.type === "plugin") return i.pluginType === subtypeFilter;
-      if (i.type === "engine") return i.engineType === subtypeFilter;
+      if (i.type === "engine") {
+        const types = i.engineTypes ?? (i.engineType ? [i.engineType] : []);
+        return types.includes(subtypeFilter);
+      }
       return true;
     });
   }
@@ -252,7 +257,10 @@ export function collectSubtypes(
   if (typeFilter === "engine") {
     const set = new Set<string>();
     items.forEach((i) => {
-      if (i.type === "engine" && i.engineType) set.add(i.engineType);
+      if (i.type !== "engine") return;
+      for (const engineType of i.engineTypes ?? (i.engineType ? [i.engineType] : [])) {
+        set.add(engineType);
+      }
     });
     return Array.from(set).sort();
   }

@@ -1,5 +1,5 @@
 import { Context } from "hono";
-import { getEngineRegistry } from "../extensions/engines/registry";
+import { listEngineIds } from "../extensions/engines/registry";
 import { getSlotPlugins } from "../extensions/slots/registry";
 import {
   EngineConfig,
@@ -131,9 +131,8 @@ export const _applyRateLimit = async (c: Context): Promise<Response | null> => {
 };
 
 export function parseEngineConfig(query: URLSearchParams): EngineConfig {
-  const registry = getEngineRegistry();
   const config: EngineConfig = {};
-  for (const { id } of registry) {
+  for (const id of listEngineIds()) {
     config[id] = query.get(id) !== "false";
   }
   return config;
@@ -176,7 +175,8 @@ export async function runSlotPlugins(
       continue;
     }
     const slotSettingsId = plugin.settingsId ?? `slot-${plugin.id}`;
-    let effectivePosition: SlotPanelPosition = plugin.position;
+    let definedPosition: SlotPanelPosition = plugin.position;
+
     if (plugin.slotPositions?.length) {
       const raw = await getSettings(slotSettingsId);
       const chosen = asString(raw[SLOT_POSITION_SETTING_KEY]);
@@ -184,10 +184,10 @@ export async function runSlotPlugins(
         chosen &&
         plugin.slotPositions.includes(chosen as SlotPanelPosition)
       ) {
-        effectivePosition = chosen as SlotPanelPosition;
+        definedPosition = chosen as SlotPanelPosition;
       }
     }
-    if (exclude && effectivePosition === exclude) continue;
+    if (exclude && definedPosition === exclude) continue;
     try {
       if (await isDisabled(slotSettingsId)) continue;
       const ok = await Promise.resolve(plugin.trigger(query.trim()));
@@ -218,7 +218,7 @@ export async function runSlotPlugins(
           plugin.t ? syncVortexSignal(out.html, plugin.t, locale) : out.html,
           `slots/${plugin.id}`,
         ),
-        position: effectivePosition,
+        position: definedPosition,
         gridSize: plugin.gridSize,
       });
     } catch (err) {

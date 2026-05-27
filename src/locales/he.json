@@ -208,7 +208,9 @@
       "exposure-safe": "בקשות הדפדפן עוברות דרך השרת",
       "exposure-unknown": "התנהגות הרשת לא הוצהרה",
       "status-configured": "מוגדר",
-      "status-needs-config": "נדרשת הגדרה"
+      "status-needs-config": "נדרשת הגדרה",
+      "extra-types": "סוגים נוספים:",
+      "requires-newer-version": "נדרשת גרסה חדשה יותר של Degoog"
     },
     "errors": {
       "load-extensions": "טעינת התוספים נכשלה.",

@@ -2,6 +2,8 @@ import { describe, test, expect, beforeAll } from "bun:test";
 import {
   initEngines,
   getEngineMap,
+  primaryType,
+  resolveTabSearchType,
 } from "../../src/server/extensions/engines/registry";
 
 describe("engines registry", () => {
@@ -20,6 +22,20 @@ describe("engines registry", () => {
     expect(map["brave"]).toBeUndefined();
     expect(map["wikipedia"]).toBeUndefined();
     expect(map["reddit"]).toBeUndefined();
+  });
+
+  test("primaryType uses first declared type", () => {
+    expect(primaryType(["web", "extracool", "third"])).toBe("web");
+    expect(primaryType(["extracool", "third"])).toBe("extracool");
+    expect(primaryType(["images"])).toBe("images");
+    expect(primaryType([])).toBe("web");
+  });
+
+  test("resolveTabSearchType honors preferred tab when listed", () => {
+    const types = ["web", "extracool", "third"];
+    expect(resolveTabSearchType(types, "third")).toBe("third");
+    expect(resolveTabSearchType(types, "web")).toBe("web");
+    expect(resolveTabSearchType(types)).toBe("web");
   });
 
 });

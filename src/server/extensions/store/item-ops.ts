@@ -195,33 +195,36 @@ async function installDependencies(dependencies: string[]): Promise<void> {
 const ENGINE_TYPE_STRING_RE = /export\s+const\s+type\s*=\s*["']([^"']+)["']/;
 const ENGINE_TYPE_ARRAY_RE =
   /export\s+const\s+type\s*=\s*\[([^\]]+)\]/;
-const engineTypeCache = new Map<string, string | null>();
+const engineTypesCache = new Map<string, string[] | null>();
 
-const readEngineType = async (dir: string): Promise<string | null> => {
-  if (engineTypeCache.has(dir)) return engineTypeCache.get(dir) ?? null;
-  let result: string | null = null;
+const parseEngineTypesFromSource = (src: string): string[] | null => {
+  const strMatch = ENGINE_TYPE_STRING_RE.exec(src);
+  if (strMatch) return [strMatch[1].trim()];
+  const arrMatch = ENGINE_TYPE_ARRAY_RE.exec(src);
+  if (!arrMatch) return null;
+  const types = arrMatch[1]
+    .split(",")
+    .map((s) => s.trim().replace(/^["']|["']$/g, ""))
+    .filter(Boolean);
+  return types.length > 0 ? types : null;
+};
+
+const catalogPrimaryType = (types: string[]): string =>
+  types.length > 0 ? types[0] : "web";
+
+const readEngineTypes = async (dir: string): Promise<string[] | null> => {
+  if (engineTypesCache.has(dir)) return engineTypesCache.get(dir) ?? null;
+  let result: string[] | null = null;
   for (const file of ["index.js", "index.ts"]) {
     try {
       const src = await readFile(join(dir, file), "utf-8");
-      const strMatch = ENGINE_TYPE_STRING_RE.exec(src);
-      if (strMatch) {
-        result = strMatch[1].trim();
-        break;
-      }
-      const arrMatch = ENGINE_TYPE_ARRAY_RE.exec(src);
-      if (arrMatch) {
-        const types = arrMatch[1]
-          .split(",")
-          .map((s) => s.trim().replace(/^["']|["']$/g, ""))
-          .filter(Boolean);
-        result = types.find((t) => t !== "web") ?? types[0] ?? null;
-        break;
-      }
+      result = parseEngineTypesFromSource(src);
+      if (result) break;
     } catch {
       continue;
     }
   }
-  engineTypeCache.set(dir, result);
+  engineTypesCache.set(dir, result);
   return result;
 };
 
@@ -314,9 +317,23 @@ export async function listRepoItems(repoUrl?: string): Promise<StoreItem[]> {
         };
         if (type === ExtensionStoreType.Plugin && ent.type)
           item.pluginType = ent.type;
-        if (type === ExtensionStoreType.Engine)
-          item.engineType =
-            ent.type ?? (await readEngineType(fullPath)) ?? "web";
+        if (type === ExtensionStoreType.Engine) {
+          const manifestTypes = ent.type
+            ? ent.type
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean)
+            : null;
+          const fileTypes = await readEngineTypes(fullPath);
+          const types =
+            manifestTypes && manifestTypes.length > 0
+              ? manifestTypes
+              : fileTypes && fileTypes.length > 0
+                ? fileTypes
+                : ["web"];
+          item.engineTypes = types;
+          item.engineType = catalogPrimaryType(types);
+        }
         items.push(item);
       }
     };

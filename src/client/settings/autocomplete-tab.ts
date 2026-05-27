@@ -8,7 +8,7 @@ const t = window.scopedT("core");
 const _renderAutocompleteCard = (provider: ExtensionMeta): string => {
   const isEnabled = provider.settings["disabled"] !== "true";
   const versionWarning = provider.requiresNewerVersion
-    ? `<span class="ext-version-warning">Requires a newer version of Degoog</span>`
+    ? `<span class="ext-version-warning">${escapeHtml(t("settings-page.extensions.requires-newer-version"))}</span>`
     : "";
   const status = provider.configurable ? getConfigStatus(provider) : null;
   const badge =

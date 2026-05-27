@@ -13,7 +13,11 @@ import {
 } from "../../types";
 import { abortAcReq, hideAcDropdown } from "../autocomplete";
 import { triggerUovadipasqua } from "../uovadipasqua";
-import { getEngines } from "../engines";
+import {
+  getEngines,
+  getKnownSearchTypePrefixes,
+  isBuiltinSearchType,
+} from "../engines";
 import { setActiveTab, setTabsForBang } from "../navigation";
 import { buildPaginationHtml } from "../pagination";
 import {
@@ -72,24 +76,26 @@ export async function performSearch(
   const isInit = state.isInitialLoad;
   state.isInitialLoad = false;
 
-  if (resolvedType.startsWith("tab:")) {
-    const { performTabSearch } = await import("../../modules/tabs/tab-search");
-    return performTabSearch(query, resolvedType.slice(4), page);
-  }
-
   const prefixMatch = query.trim().match(/^(\w+):(.+)$/);
   if (prefixMatch && !query.trim().startsWith("http")) {
     const prefix = prefixMatch[1].toLowerCase();
     const actualQuery = prefixMatch[2].trim();
     if (actualQuery) {
-      const { getPluginTabIds } = await import("../../modules/tabs/tabs");
-      const knownTypes = await getPluginTabIds();
-      if (prefix !== "web" && knownTypes.has(prefix)) {
+      const knownTypes = await getKnownSearchTypePrefixes();
+      if (knownTypes.has(prefix)) {
+        if (isBuiltinSearchType(prefix)) {
+          return performSearch(actualQuery, prefix, page);
+        }
         const { performTabSearch } =
           await import("../../modules/tabs/tab-search");
         return performTabSearch(actualQuery, `engine:${prefix}`, page);
       }
     }
+  }
+
+  if (resolvedType.startsWith("tab:")) {
+    const { performTabSearch } = await import("../../modules/tabs/tab-search");
+    return performTabSearch(query, resolvedType.slice(4), page);
   }
 
   if (query.trim().startsWith("!") || /\s!\S+$/.test(query.trim())) {
@@ -295,7 +301,7 @@ async function _performBangCommand(
     if (!res.ok) throw new Error("not found");
     const data = (await res.json()) as {
       type: string;
-      searchType?: string;
+      primaryType?: string;
       results?: ScoredResult[];
       engineTimings?: { name: string; time: number; resultCount: number }[];
       totalTime?: number;
@@ -305,7 +311,7 @@ async function _performBangCommand(
       page?: number;
     };
     if (data.type === "engine") {
-      const engineType = data.searchType ?? "web";
+      const engineType = data.primaryType ?? "web";
       const isMedia = engineType === "images";
       state.currentResults = data.results ?? [];
       state.currentData = data as unknown as SearchResponse;

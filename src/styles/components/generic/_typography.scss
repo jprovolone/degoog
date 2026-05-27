@@ -58,9 +58,10 @@ a {
     border: 1px solid transparent;
   }
 
-  &--store-type {
+  &--store-type,
+  &--engine-type {
     font-weight: 500;
-    background: var(--bg-hover);
+    background: var(--bg);
     text-transform: capitalize;
   }
 

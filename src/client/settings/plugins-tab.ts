@@ -36,7 +36,7 @@ const _renderPluginCard = (
     ? `<span class="ext-card-desc">${renderMdInline(plugin.description)}</span>`
     : "";
   const versionWarning = plugin.requiresNewerVersion
-    ? `<span class="ext-version-warning">Requires a newer version of Degoog</span>`
+    ? `<span class="ext-version-warning">${escapeHtml(t("settings-page.extensions.requires-newer-version"))}</span>`
     : "";
   const status = plugin.configurable ? getConfigStatus(plugin) : null;
   const badge =

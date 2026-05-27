@@ -224,7 +224,9 @@
       "exposure-safe": "Browser requests go through the server",
       "exposure-unknown": "Network behaviour not declared",
       "status-configured": "Configured",
-      "status-needs-config": "Needs configuration"
+      "status-needs-config": "Needs configuration",
+      "extra-types": "Extra types:",
+      "requires-newer-version": "Requires a newer version of Degoog"
     },
     "errors": {
       "load-extensions": "Failed to load extensions.",

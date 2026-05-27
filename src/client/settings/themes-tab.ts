@@ -26,7 +26,7 @@ const _renderThemeCard = (
     ? `<span class="ext-card-active">${escapeHtml(t("settings-page.extensions.active"))}</span>`
     : "";
   const versionWarning = themeExt.requiresNewerVersion
-    ? `<span class="ext-version-warning">Requires a newer version of Degoog</span>`
+    ? `<span class="ext-version-warning">${escapeHtml(t("settings-page.extensions.requires-newer-version"))}</span>`
     : "";
   return `
     <div class="ext-card degoog-panel degoog-panel--ext-card" data-theme-id="${escapeHtml(themeId)}">
