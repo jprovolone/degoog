@@ -157,6 +157,54 @@
           </h2>
           <div id="engines-content"></div>
         </section>
+
+        <section
+          class="settings-section ext-card degoog-panel degoog-panel--ext-card"
+          id="indexer-public-section"
+          style="display: none"
+        >
+          <h2 class="settings-section-heading">
+            {{t:settings-page.indexer.heading}}
+          </h2>
+          <p class="settings-desc">{{t:settings-page.indexer.desc}}</p>
+
+          <div id="indexer-public-stats" class="settings-stat-grid degoog-stat-grid"></div>
+
+          <div class="settings-action-row">
+            <button
+              type="button"
+              class="btn btn--secondary degoog-btn degoog-btn--secondary"
+              id="indexer-public-export-btn"
+            >
+              {{t:settings-page.indexer.export-btn}}
+            </button>
+          </div>
+
+          <fieldset class="settings-fieldset">
+            <label class="settings-field-label" for="indexer-public-target-url">
+              {{t:settings-page.indexer-public.push-label}}
+            </label>
+            <div class="settings-action-row">
+              <input
+                type="url"
+                id="indexer-public-target-url"
+                class="degoog-input"
+                placeholder="{{t:settings-page.indexer-public.push-placeholder}}"
+              />
+              <button
+                type="button"
+                class="btn btn--secondary degoog-btn degoog-btn--secondary"
+                id="indexer-public-push-btn"
+              >
+                {{t:settings-page.indexer-public.push-btn}}
+              </button>
+            </div>
+            <p class="settings-field-desc">
+              {{t:settings-page.indexer-public.push-desc}}
+            </p>
+            <p id="indexer-public-push-status" class="settings-field-desc"></p>
+          </fieldset>
+        </section>
       </main>
     </div>
 

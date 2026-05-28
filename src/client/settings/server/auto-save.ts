@@ -24,6 +24,7 @@ const TOGGLE_IDS = [
   "api-key-suggest-enabled",
   "honeypot-enabled",
   "honeypot-css-check",
+  "degoog-indexer-enabled",
 ] as const;
 
 const TEXT_FIELD_IDS = [
@@ -68,6 +69,7 @@ export const buildPayload = (): Record<string, string> => ({
   honeypotEnabled: boolStr("honeypot-enabled"),
   honeypotCssCheck: boolStr("honeypot-css-check"),
   honeypotBanDuration: val("honeypot-ban-duration"),
+  degoogIndexerEnabled: boolStr("degoog-indexer-enabled"),
 });
 
 export const saveGeneral = async (getToken: () => string | null): Promise<void> => {

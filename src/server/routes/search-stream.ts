@@ -27,6 +27,7 @@ import { signResultThumbnails } from "../utils/proxy-sign";
 import { parseImageFilter, parsePage } from "./search/_parsers";
 import { runIntercepts } from "../utils/run-interceptors";
 import { getInstanceSettings } from "../utils/server-settings";
+import { DEGOOG_ENGINE_NAME, recordResults } from "../indexer/store";
 
 const router = new Hono();
 
@@ -254,6 +255,18 @@ router.get("/api/search/stream", async (c) => {
           ? cache.SHORT_TTL_MS
           : undefined;
         await cache.set(key, response, ttl);
+
+        const settings = await getInstanceSettings();
+        if (asBoolean(settings.degoogIndexerEnabled)) {
+          const toIndex = rawScoredResults.filter(
+            (r) =>
+              r.source !== DEGOOG_ENGINE_NAME &&
+              !(r.sources ?? []).includes(DEGOOG_ENGINE_NAME),
+          );
+          if (toIndex.length > 0) {
+            queueMicrotask(() => recordResults(query, type, toIndex));
+          }
+        }
 
         _send("done", {
           totalTime,

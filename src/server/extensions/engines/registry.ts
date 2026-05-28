@@ -21,8 +21,19 @@ import {
 } from "../transports/registry";
 import { enginesDir, defaultEnginesFile } from "../../utils/paths";
 import { readFileSync } from "fs";
+import { join } from "path";
 import { createRegistry } from "../registry-factory";
 import { extensionReadmeExists } from "../../utils/extension-docs";
+import { logger } from "../../utils/logger";
+
+const builtinsDir = join(
+  process.cwd(),
+  "src",
+  "server",
+  "extensions",
+  "engines",
+  "builtins",
+);
 
 export type EngineSearchType = string;
 
@@ -72,9 +83,35 @@ export const resolveTabSearchType = (
   return primaryType(types);
 };
 
+type TypeFn = () => string[] | Promise<string[]>;
+
+const _coerceTypeList = (raw: unknown): string[] => {
+  if (Array.isArray(raw)) {
+    return raw.filter((t): t is string => typeof t === "string" && t.trim() !== "");
+  }
+  if (typeof raw === "string" && raw.trim()) return [raw];
+  return [];
+};
+
+const _resolving = new Set<string>();
+
 const resolveEngineTypes = async (entry: PluginEntry): Promise<string[]> => {
   const override = await getTypeOverride(entry.id);
-  return resolveTypes(entry.searchTypes, override);
+  const dyn = (entry.instance as SearchEngine & { __typeFn?: TypeFn }).__typeFn;
+  let base: string[] = entry.searchTypes;
+  if (dyn && !_resolving.has(entry.id)) {
+    _resolving.add(entry.id);
+    try {
+      const result = await dyn();
+      base = _coerceTypeList(result);
+      if (base.length === 0) base = entry.searchTypes;
+    } catch (err) {
+      logger.warn("engines", `dynamic type() failed for ${entry.id}`, err);
+    } finally {
+      _resolving.delete(entry.id);
+    }
+  }
+  return resolveTypes(base.length > 0 ? base : ["web"], override);
 };
 
 const isSearchEngine = (val: unknown): val is SearchEngine => {
@@ -89,7 +126,10 @@ const isSearchEngine = (val: unknown): val is SearchEngine => {
 };
 
 const engineRegistry = createRegistry<PluginEntry>({
-  dirs: () => [{ dir: enginesDir() }],
+  dirs: () => [
+    { dir: builtinsDir, source: "builtin" },
+    { dir: enginesDir() },
+  ],
   canonicalIdKind: "engine",
   match: (mod) => {
     const Export = mod.default ?? mod.engine ?? mod.Engine;
@@ -98,18 +138,15 @@ const engineRegistry = createRegistry<PluginEntry>({
         ? new (Export as new () => SearchEngine)()
         : (Export as SearchEngine);
     if (!isSearchEngine(instance)) return null;
-    const modType = mod.type;
-    const searchTypes: string[] = Array.isArray(modType)
-      ? modType.filter(
-          (t): t is string => typeof t === "string" && t.trim() !== "",
-        )
-      : typeof modType === "string" && modType.trim()
-        ? [modType as string]
-        : ["web"];
+    const isFn = typeof mod.type === "function";
+    (instance as SearchEngine & { __typeFn?: TypeFn }).__typeFn = isFn
+      ? (mod.type as TypeFn)
+      : undefined;
+    const declared = isFn ? [] : _coerceTypeList(mod.type);
     return {
       id: "",
       displayName: instance.name,
-      searchTypes: searchTypes.length > 0 ? searchTypes : ["web"],
+      searchTypes: declared.length > 0 ? declared : isFn ? [] : ["web"],
       description:
         typeof mod.description === "string" ? mod.description : undefined,
       instance,

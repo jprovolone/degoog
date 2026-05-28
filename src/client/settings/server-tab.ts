@@ -12,6 +12,7 @@ import {
 import { renderScoreRows, scoreRowTemplate } from "./server/domain-score";
 import { initHoneypot } from "./server/honeypot";
 import { bindToggleAutoSave, injectFieldSaveBtns } from "./server/auto-save";
+import { setIndexerNavVisible } from "./indexer-tab";
 
 const t = window.scopedT("core");
 
@@ -51,6 +52,7 @@ type ServerSettingsData = {
   honeypotEnabled?: BoolSetting;
   honeypotCssCheck?: BoolSetting;
   honeypotBanDuration?: string;
+  degoogIndexerEnabled?: BoolSetting;
 };
 
 let _apiKey = "";
@@ -116,6 +118,11 @@ async function _loadServerSettings(getToken: () => string | null): Promise<void>
     setToggle("honeypot-enabled", data.honeypotEnabled ?? "true");
     setToggle("honeypot-css-check", data.honeypotCssCheck ?? "true");
     setVal("honeypot-ban-duration", data.honeypotBanDuration);
+
+    setToggle("degoog-indexer-enabled", data.degoogIndexerEnabled);
+    setIndexerNavVisible(
+      data.degoogIndexerEnabled === true || data.degoogIndexerEnabled === "true",
+    );
   } catch {}
 }
 
@@ -263,6 +270,13 @@ export async function initServerTab(
 
   bindToggleAutoSave(getToken);
   injectFieldSaveBtns(getToken);
+
+  document
+    .getElementById("settings-degoog-indexer-enabled")
+    ?.addEventListener("change", (e) => {
+      const on = (e.target as HTMLInputElement).checked;
+      setIndexerNavVisible(on);
+    });
 
   _initApiKeyControls(getToken, handleButtonState);
 

@@ -267,6 +267,7 @@ export const createSearchEngineContext = (
   dateTo?: string,
   imageFilter?: ImageFilter,
   signal?: AbortSignal,
+  searchType?: SearchType,
 ): EngineContext => {
   const resolvedLang =
     lang ||
@@ -319,6 +320,7 @@ export const createSearchEngineContext = (
       sentinel(response, engineName ?? engineSettingsId ?? "engine"),
     engineError: (status, message, opts) =>
       new SentinelBreach(status as ThreatLevel, message, opts),
+    searchType,
   };
 };
 
@@ -332,6 +334,7 @@ export const searchSingleEngine = async (
   dateTo?: string,
   imageFilter?: ImageFilter,
   signal?: AbortSignal,
+  searchType?: SearchType,
 ): Promise<{ results: SearchResult[]; timing: EngineTiming }> => {
   const engine = resolveEngine(engineName);
   if (!engine) {
@@ -355,6 +358,7 @@ export const searchSingleEngine = async (
     dateTo,
     imageFilter,
     ac.signal,
+    searchType,
   );
   try {
     const timeout = await _getEngineTimeout(engineSettingsId);
@@ -416,6 +420,7 @@ export const search = async (
         dateTo,
         imageFilter,
         ac.signal,
+        type,
       );
       const timeout = await _getEngineTimeout(id);
       const results = await _withTimeout(

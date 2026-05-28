@@ -16,7 +16,8 @@
       "transports": "Transports",
       "autocomplete": "Autocomplete",
       "themes": "Themes",
-      "store": "Store"
+      "store": "Store",
+      "indexer": "Degoog Indexer"
     },
     "tab-search": {
       "placeholder": "Search settings...",
@@ -167,6 +168,11 @@
       "honeypot-ban-permanent": "permanent",
       "honeypot-unban": "Unban",
       "honeypot-blocklist-empty": "No IPs are currently blocked.",
+      "indexer-heading": "Degoog Indexer",
+      "indexer-desc": "Record results you actually see and re-surface them as a Degoog engine on later searches.",
+      "indexer-enable": "Enable the indexer",
+      "indexer-enable-desc": "When on, search results are stored locally and the Degoog Indexer tab appears in settings.",
+      "indexer-enable-aria": "Enable Degoog indexer"
       "saved": "Saved",
       "save-failed-network": "Save failed. Please try again."
     },
@@ -248,6 +254,43 @@
     },
     "public": {
       "engines-heading": "Engines"
+    },
+    "indexer": {
+      "heading": "Degoog Indexer",
+      "desc": "Silently record every result you see and re-surface them on future searches. Federate by pushing your index to other instances and accepting pushes from theirs.",
+      "enable": "Enable the indexer",
+      "enable-desc": "When on, results from your searches are stored locally and re-surface as a Degoog engine.",
+      "public-export": "Allow public export and push from this instance",
+      "public-export-desc": "When on, anyone can download this index or push it to their instance from the public settings page. Off by default.",
+      "accept-incoming": "Accept incoming pushes",
+      "accept-incoming-desc": "When on, other Degoog instances can push their index into yours (rate-limited, size-capped). Off by default.",
+      "stats-heading": "Index stats",
+      "total-results": "Total results",
+      "total-queries": "Distinct queries",
+      "db-size": "DB size",
+      "by-type": "By engine type",
+      "export-btn": "Download index (.db)",
+      "push-label": "Push my index to another instance",
+      "push-placeholder": "https://target-instance.example",
+      "push-btn": "Push",
+      "push-desc": "Sends this instance's index to the target. The target must have Accept incoming pushes enabled.",
+      "push-success": "Pushed: {inserted} new, {updated} updated, {skipped} skipped.",
+      "push-error": "Push failed.",
+      "clear-btn": "Clear index",
+      "clear-modal-title": "Clear the index?",
+      "clear-modal-desc": "This permanently deletes every row in your local index. Type CLEAR to confirm.",
+      "clear-confirm": "Clear",
+      "clear-cancel": "Cancel",
+      "disabled": "The indexer is disabled. Enable it under Server settings."
+    },
+    "indexer-public": {
+      "push-label": "Send this index to your instance",
+      "push-placeholder": "https://your-instance.example",
+      "push-btn": "Push to my instance",
+      "push-desc": "Your instance must have Accept incoming pushes enabled.",
+      "push-success": "Pushed: {inserted} new, {updated} updated, {skipped} skipped.",
+      "push-error": "Push failed.",
+      "unavailable": "The indexer is not enabled for public access on this instance."
     },
     "store": {
       "repos-heading": "Repositories",

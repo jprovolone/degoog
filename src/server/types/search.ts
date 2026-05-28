@@ -139,6 +139,7 @@ export type EngineFetch = (
 
 export interface EngineContext {
   fetch: EngineFetch;
+  searchType?: SearchType;
   lang?: string;
   dateFrom?: string;
   dateTo?: string;

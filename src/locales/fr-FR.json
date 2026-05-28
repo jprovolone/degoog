@@ -15,7 +15,8 @@
       "plugins": "Plugins",
       "transports": "Transports",
       "themes": "Thèmes",
-      "store": "Boutique"
+      "store": "Boutique",
+      "indexer": "Indexeur Degoog"
     },
     "tab-search": {
       "placeholder": "Rechercher dans les paramètres...",
@@ -150,6 +151,11 @@
       "honeypot-ban-permanent": "permanent",
       "honeypot-unban": "Débannir",
       "honeypot-blocklist-empty": "Aucune IP n'est actuellement bloquée.",
+      "indexer-heading": "Indexeur Degoog",
+      "indexer-desc": "Enregistre les résultats que vous voyez et les réaffiche via le moteur Degoog lors des recherches suivantes.",
+      "indexer-enable": "Activer l'indexeur",
+      "indexer-enable-desc": "Lorsque c'est activé, les résultats sont stockés localement et l'onglet Indexeur Degoog apparaît dans les paramètres.",
+      "indexer-enable-aria": "Activer l'indexeur Degoog",
       "custom-css-heading": "CSS personnalisé",
       "custom-css-desc": "Injectez du CSS personnalisé dans chaque page. Chargé après les styles du thème et des plugins, il les remplace donc. Utilisez !important pour surpasser des sélecteurs à spécificité plus élevée.",
       "custom-css-label": "CSS personnalisé",
@@ -231,6 +237,40 @@
     },
     "public": {
       "engines-heading": "Moteurs"
+    },
+    "indexer": {
+      "heading": "Indexeur Degoog",
+      "desc": "Enregistre silencieusement chaque résultat affiché et les réutilise lors des recherches futures. Fédérez en poussant votre index vers d'autres instances.",
+      "public-export": "Autoriser l'export et le push publics",
+      "public-export-desc": "Lorsque c'est activé, tout le monde peut télécharger cet index ou le pousser vers sa propre instance depuis la page publique.",
+      "accept-incoming": "Accepter les push entrants",
+      "accept-incoming-desc": "Lorsque c'est activé, d'autres instances Degoog peuvent pousser leur index vers la vôtre (limité et plafonné).",
+      "stats-heading": "Statistiques de l'index",
+      "total-results": "Résultats totaux",
+      "total-queries": "Requêtes distinctes",
+      "db-size": "Taille de la base",
+      "export-btn": "Télécharger l'index (.db)",
+      "push-label": "Pousser mon index vers une autre instance",
+      "push-placeholder": "https://instance-cible.example",
+      "push-btn": "Pousser",
+      "push-desc": "Envoie l'index de cette instance vers la cible. La cible doit avoir les push entrants activés.",
+      "push-success": "Poussé : {inserted} nouveaux, {updated} mis à jour, {skipped} ignorés.",
+      "push-error": "Échec du push.",
+      "clear-btn": "Vider l'index",
+      "clear-modal-title": "Vider l'index ?",
+      "clear-modal-desc": "Supprime définitivement toutes les lignes de l'index local. Tapez CLEAR pour confirmer.",
+      "clear-confirm": "Vider",
+      "clear-cancel": "Annuler",
+      "disabled": "L'indexeur est désactivé. Activez-le dans les paramètres Serveur."
+    },
+    "indexer-public": {
+      "push-label": "Envoyer cet index vers votre instance",
+      "push-placeholder": "https://votre-instance.example",
+      "push-btn": "Pousser vers mon instance",
+      "push-desc": "Votre instance doit avoir les push entrants activés.",
+      "push-success": "Poussé : {inserted} nouveaux, {updated} mis à jour, {skipped} ignorés.",
+      "push-error": "Échec du push.",
+      "unavailable": "L'indexeur n'est pas accessible publiquement sur cette instance."
     },
     "store": {
       "repos-heading": "Dépôts",

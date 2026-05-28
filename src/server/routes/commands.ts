@@ -5,7 +5,7 @@ import {
 } from "../extensions/commands/registry";
 import { getEngineSearchType } from "../extensions/engines/registry";
 import { searchSingleEngine } from "../search";
-import type { TimeFilter } from "../types";
+import type { SearchType, TimeFilter } from "../types";
 import { getLocale } from "../utils/hono";
 import { logger } from "../utils/logger";
 import { isDisabled } from "../utils/plugin-settings";
@@ -44,16 +44,25 @@ router.get("/api/command", async (c) => {
         { error: "Missing search query after engine shortcut" },
         400,
       );
+    const requestedType = c.req.query("type")?.trim() || undefined;
+    const resolvedType =
+      (await getEngineSearchType(match.engineId, requestedType)) ?? "web";
     const { results, timing } = await searchSingleEngine(
       match.engineId,
       match.query,
       page,
       timeFilter,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      resolvedType as SearchType,
     );
     return c.json({
       type: "engine",
       engineId: match.engineId,
-      primaryType: (await getEngineSearchType(match.engineId)) ?? "web",
+      primaryType: resolvedType,
       results: results.map((r, i) => ({
         ...r,
         score: Math.max(10 - i, 1),

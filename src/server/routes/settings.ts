@@ -55,6 +55,9 @@ const GENERAL_ALLOWED_KEYS = [
   "honeypotEnabled",
   "honeypotCssCheck",
   "honeypotBanDuration",
+  "degoogIndexerEnabled",
+  "degoogIndexerPublicExport",
+  "degoogIndexerAcceptIncoming",
 ] as const;
 
 const BOOLEAN_SETTING_KEYS = new Set<(typeof GENERAL_ALLOWED_KEYS)[number]>([
@@ -76,6 +79,9 @@ const BOOLEAN_SETTING_KEYS = new Set<(typeof GENERAL_ALLOWED_KEYS)[number]>([
   "apiKeySuggestEnabled",
   "honeypotEnabled",
   "honeypotCssCheck",
+  "degoogIndexerEnabled",
+  "degoogIndexerPublicExport",
+  "degoogIndexerAcceptIncoming",
 ]);
 
 const _normalizeHostname = (raw: string): string =>

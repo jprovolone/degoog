@@ -7,6 +7,7 @@ export const SETTINGS_TABS = [
   "autocomplete",
   "themes",
   "store",
+  "indexer",
 ] as const;
 
 export type SettingsTab = (typeof SETTINGS_TABS)[number];

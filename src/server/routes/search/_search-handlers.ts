@@ -6,6 +6,9 @@ import { signResultThumbnails } from "../../utils/proxy-sign";
 import { logger } from "../../utils/logger";
 import { applyDomainRules } from "./_domain-rules";
 import { runIntercepts } from "../../utils/run-interceptors";
+import { getInstanceSettings } from "../../utils/server-settings";
+import { asBoolean } from "../../utils/plugin-settings";
+import { DEGOOG_ENGINE_NAME, recordResults } from "../../indexer/store";
 
 export async function handleSearch(params: SearchParams) {
   const {
@@ -67,6 +70,18 @@ export async function handleSearch(params: SearchParams) {
   const ttl = cache.hasFailedEngines(response) ? cache.SHORT_TTL_MS : undefined;
   await cache.set(key, response, ttl);
 
+  const settings = await getInstanceSettings();
+  if (asBoolean(settings.degoogIndexerEnabled)) {
+    const toIndex = response.results.filter(
+      (r) =>
+        r.source !== DEGOOG_ENGINE_NAME &&
+        !(r.sources ?? []).includes(DEGOOG_ENGINE_NAME),
+    );
+    if (toIndex.length > 0) {
+      queueMicrotask(() => recordResults(query, type, toIndex));
+    }
+  }
+
   return {
     ...response,
     results: signResultThumbnails(await applyDomainRules(response.results)),
@@ -89,6 +104,8 @@ export async function handleRetry(
     imageFilter,
   } = params;
 
+  const { overrides } = await runIntercepts(query, lang);
+  const type = (overrides.searchType ?? searchType) as typeof searchType;
   const { results: newResults, timing } = await searchSingleEngine(
     engineName,
     query,
@@ -98,6 +115,8 @@ export async function handleRetry(
     dateFrom,
     dateTo,
     imageFilter,
+    undefined,
+    type,
   );
   const key = cacheKey(
     query,

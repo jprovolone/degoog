@@ -12,6 +12,8 @@ import { initAutocompleteTab } from "../../settings/autocomplete-tab";
 import { initThemesTab } from "../../settings/themes-tab";
 import { initServerTab } from "../../settings/server-tab";
 import { initStoreTab } from "../../settings/store-tab";
+import { initIndexerTab } from "../../settings/indexer-tab";
+import { initIndexerPublic } from "../../settings/indexer-public";
 import { initGlobalSearch } from "../../settings/settings-search";
 import { initSettingsWizard } from "../wizard/wizard";
 import "../modals/settings-modal/modal";
@@ -207,6 +209,8 @@ async function _initSettings(): Promise<void> {
     await initThemesTab(themesData, allExtensions.themes ?? []);
     const storeEl = document.getElementById("store-content");
     if (storeEl) void initStoreTab(storeEl, getStoredToken);
+    const indexerEl = document.getElementById("indexer-content");
+    if (indexerEl) void initIndexerTab(indexerEl);
     initGlobalSearch();
     void initSettingsWizard();
   } catch {
@@ -260,6 +264,7 @@ async function _initPublicSettings(): Promise<void> {
     if (enginesEl)
       enginesEl.innerHTML = `<p>${t("settings-page.errors.load-engines")}</p>`;
   }
+  void initIndexerPublic();
 }
 
 async function _init(): Promise<void> {
