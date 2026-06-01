@@ -6,7 +6,9 @@
 
 Search aggregator that queries multiple engines and shows results in one place. You can add custom search engines, bang-command plugins, slot plugins (query-triggered panels above/below results or in the sidebar), and transports (custom HTTP fetch strategies like curl, FlareSolverr, or your own). The dream would be to eventually have a user made marketplace for plugins/engines.
 
-**Still in beta.** Not intended for production use yet.
+**Now in stable beta.** You can use it in production but there may be _some_ inconsistent behaviour.
+
+Please check the docs [here](https://degoog-org.github.io/docs/) before raising issues, your questions may already have been answered.
 
 ---
 
