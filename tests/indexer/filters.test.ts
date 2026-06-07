@@ -7,6 +7,7 @@ const baseCfg: IndexerConfig = {
   maxPerSearch: 30,
   maxUrls: 0,
   maxHits: 0,
+  fuzzyMinTermRatio: 0.6,
   pruneEnabled: false,
   fuzzyEnabled: true,
   queryLimit: 30,
