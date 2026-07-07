@@ -32,6 +32,7 @@
       "videos": "Video",
       "news": "Notizie",
       "options": "Opzioni",
+      "filter": "Filtri",
       "time": "Periodo",
       "any-time": "Qualsiasi periodo",
       "language": "Lingua",
@@ -47,11 +48,16 @@
       "filter-languages": "Filtra lingue..."
     },
     "image-filters": {
+      "title": "Filtri",
+      "default": "Predefinito",
+      "toggle": "Filtri",
+      "close": "Chiudi filtri",
       "size": "Dimensione",
       "color": "Colore",
       "type": "Tipo",
       "layout": "Formato",
-      "nsfw": "NSFW",
+      "nsfw": "Modalità sicura",
+      "transparent": "Trasparente",
       "small": "Piccola",
       "medium": "Media",
       "large": "Grande",
@@ -79,6 +85,28 @@
       "gray": "Grigio",
       "black": "Nero",
       "white": "Bianco"
+    },
+    "no-results": "Nessun risultato trovato.",
+    "search-failed": "Ricerca fallita. Riprova.",
+    "no-engines": "Nessun motore di ricerca installato. {store} per sfogliarne e installarne alcuni.",
+    "no-engines-store": "Vai allo Store",
+    "sidebar": {
+      "engine-performance": "Prestazioni dei motori",
+      "people-also-search": "Le persone cercano anche",
+      "info": "Info",
+      "results": "{count} risultati",
+      "retry": "riprova",
+      "retrying": "nuovo tentativo...",
+      "failure-reasons": {
+        "blocked": "Bloccato dal motore",
+        "rate_limited": "Troppe richieste",
+        "captcha": "Verifica CAPTCHA",
+        "parse_error": "Risposta illeggibile",
+        "timeout": "Tempo scaduto",
+        "network": "Errore di rete",
+        "interstitial": "Bloccato da una pagina intermedia",
+        "unknown": "Nessuna risposta utile da questo motore"
+      }
     },
     "result": {
       "just-indexed": "appena indicizzato",

@@ -108,23 +108,41 @@
   }
 }
 
-.degoog-card-order {
+.degoog-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  padding: $space-2 $space-1;
+  color: var(--text-secondary);
+  cursor: grab;
+  opacity: 0.5;
+  touch-action: none;
+  user-select: none;
+  transition: opacity $transition-fast;
 
-  &-btn {
-    display: block;
-
-    &:disabled {
-      cursor: default;
-      opacity: 0.2;
-      pointer-events: none;
-    }
+  &:hover {
+    opacity: 1;
   }
 
-  @media (max-width: 768px) {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.degoog-drag-active,
+.degoog-drag-active * {
+  user-select: none;
+}
+
+.degoog-dragging {
+  position: relative;
+  z-index: 5;
+  cursor: grabbing;
+  will-change: transform;
+
+  &.ext-card {
+    background: var(--bg-hover);
   }
 }
 
@@ -356,6 +374,97 @@
         opacity: 0.9;
       }
     }
+  }
+}
+
+.ext-list {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+
+  &-rows {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+
+  &-row {
+    background: var(--bg);
+    border-radius: $radius-md;
+    padding: $space-2 $space-3;
+  }
+
+  &-row-head {
+    align-items: center;
+    display: flex;
+    gap: $space-2;
+  }
+
+  &-row-summary {
+    flex: 1;
+    color: var(--text-primary);
+    font-size: $font-size-small;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &-row-edit,
+  &-row-remove {
+    align-items: center;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 1.1rem;
+    height: 1.75rem;
+    justify-content: center;
+    line-height: 1;
+    padding: 0;
+    width: 1.75rem;
+    flex-shrink: 0;
+
+    &:hover {
+      color: var(--text-primary);
+    }
+  }
+
+  &-row-editor {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+    margin-top: $space-3;
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  &-sub {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+
+    &--toggle {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+  }
+
+  &-sub-label {
+    color: var(--text-secondary);
+    font-size: $font-size-small;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  &-add {
+    align-self: flex-start;
   }
 }
 

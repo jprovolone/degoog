@@ -9,6 +9,7 @@ export interface AppState {
   lastPage: number;
   currentResults: ScoredResult[];
   currentData: SearchResponse | null;
+  currentRelatedSearches: string[];
   imagePage: number;
   imageLastPage: number;
   videoPage: number;
@@ -24,6 +25,7 @@ export interface AppState {
   displaySearchSuggestions: boolean;
   postMethodEnabled: boolean;
   inlineGifPlayback: boolean;
+  stickySidebar: boolean;
   isInitialLoad: boolean;
   imageFilter: ImageFilter;
 }

@@ -138,6 +138,14 @@
   min-width: 12.5rem;
 }
 
+.store-btn-add-confirm {
+  height: $search-bar-height;
+  width: $search-bar-height;
+  font-size: $font-size-md;
+  padding: 0;
+  flex-shrink: 0;
+}
+
 .store-inline-error {
   color: $danger;
   font-size: $font-size-small;
@@ -199,7 +207,7 @@
   align-items: center;
   justify-content: space-between;
   gap: $space-3;
-  padding: $space-2 $space-3;
+  padding: $space-3;
   background: var(--bg-hover);
   border-radius: $radius-md;
 }
@@ -327,6 +335,39 @@
   min-height: 8.75rem;
 }
 
+.store-card-keycaps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: $space-2;
+  padding: $space-4;
+  background: var(--bg-hover);
+}
+
+.store-keycap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  height: 2.5rem;
+  padding: 0 $space-3;
+  font-family: inherit;
+  font-size: $font-size-md;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--text-primary);
+  background: var(--bg-light);
+  border-radius: $radius-md;
+  box-shadow: 0 3px 0 var(--border), 0 4px 4px rgba(0, 0, 0, 0.12);
+}
+
+.store-keycap-plus {
+  font-size: $font-size-small;
+  font-weight: 600;
+  color: var(--text-muted, var(--text-secondary));
+}
+
 .store-card-body {
   padding: 0;
   display: flex;
@@ -424,6 +465,24 @@
   button {
     flex: 1;
     min-width: 0;
+  }
+}
+
+.store-btn-update-icon {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  border-radius: $radius-md;
+  color: $primary;
+  cursor: pointer;
+  flex: none;
+  font-size: $font-size-md;
+  padding: $space-2 $space-3;
+  transition: opacity $transition-fast;
+
+  &:hover {
+    opacity: 0.7;
   }
 }
 
@@ -564,4 +623,96 @@
   font-weight: 500;
   padding: $space-2 $space-4;
   letter-spacing: 0.02em;
+}
+
+.store-progress-host {
+  position: relative;
+}
+
+.store-progress {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: $space-2;
+  padding: $space-3;
+  border-radius: inherit;
+  background: var(--bg-light);
+  pointer-events: none;
+}
+
+.store-progress-label {
+  font-size: $font-size-small;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.store-progress-bar {
+  width: 80%;
+  max-width: 12rem;
+  height: $space-2;
+  border-radius: $radius-pill;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+
+.store-progress-bar-fill {
+  display: block;
+  width: 40%;
+  height: 100%;
+  border-radius: $radius-pill;
+  background: $primary;
+}
+
+.is-working .store-progress-bar-fill {
+  animation: store-progress-slide 1s ease-in-out infinite;
+}
+
+.is-ok {
+  .store-progress-label {
+    color: $primary;
+  }
+
+  .store-progress-bar-fill {
+    width: 100%;
+    background: $primary;
+  }
+}
+
+.is-failed {
+  .store-progress-label {
+    color: $danger;
+  }
+
+  .store-progress-bar-fill {
+    width: 100%;
+    background: $danger;
+  }
+}
+
+.store-repo-item {
+  .store-progress {
+    padding: $space-1;
+    gap: 0;
+  }
+
+  .store-progress-label {
+    display: none;
+  }
+
+  .store-progress-bar {
+    width: 90%;
+  }
+}
+
+@keyframes store-progress-slide {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(275%);
+  }
 }

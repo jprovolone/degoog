@@ -41,6 +41,7 @@ export enum ExtensionStoreType {
   Engine = "engine",
   Transport = "transport",
   Autocomplete = "autocomplete",
+  Shortcut = "shortcut",
 }
 
 
@@ -55,6 +56,8 @@ export interface SettingField {
   | "toggle"
   | "textarea"
   | "select"
+  | "urllist"
+  | "list"
   | "info";
   required?: boolean;
   placeholder?: string;
@@ -65,6 +68,8 @@ export interface SettingField {
   default?: string;
   advanced?: boolean;
   visibleWhen?: { key: string; equals: string };
+  itemSchema?: SettingField[];
+  addLabel?: string;
 }
 
 export interface PluginManifest {
@@ -92,6 +97,7 @@ export interface ExtensionMeta {
   defaultFeedUrls?: string[];
   isClientExposed?: boolean;
   requiresNewerVersion?: boolean;
+  needsAppRestart?: boolean;
 }
 
 export interface PluginContext {
@@ -112,6 +118,7 @@ export interface PluginContext {
 export interface SearchEngine {
   name: string;
   bangShortcut?: string;
+  needsAppRestart?: boolean;
   settingsSchema?: SettingField[];
   configure?(settings: Record<string, SettingValue>): void;
   executeSearch(
@@ -144,6 +151,7 @@ export type AutocompleteSuggestion =
 
 export interface AutocompleteProvider {
   name: string;
+  needsAppRestart?: boolean;
   settingsSchema?: SettingField[];
   configure?(settings: Record<string, SettingValue>): void;
   getSuggestions(
@@ -172,6 +180,7 @@ export interface SlotPlugin {
   slotPositions?: SlotPanelPosition[];
   settingsId?: string;
   isClientExposed?: boolean;
+  needsAppRestart?: boolean;
   priority?: number;
   trigger: (query: string) => boolean | Promise<boolean>;
   waitForResults?: boolean;
@@ -207,6 +216,7 @@ export interface BangCommand {
   aliases?: string[];
   naturalLanguagePhrases?: string[];
   isClientExposed?: boolean;
+  needsAppRestart?: boolean;
   settingsSchema?: SettingField[];
   configure?(settings: Record<string, SettingValue>): void;
   isConfigured?(): Promise<boolean>;
@@ -221,6 +231,7 @@ export interface SearchResultTab {
   icon?: string;
   engineType?: string;
   isClientExposed?: boolean;
+  needsAppRestart?: boolean;
   settingsId?: string;
   executeSearch?(
     query: string,
@@ -242,6 +253,7 @@ export interface RequestMiddleware {
   name: string;
   settingsId?: string;
   isClientExposed?: boolean;
+  needsAppRestart?: boolean;
   settingsSchema?: SettingField[];
   configure?(settings: Record<string, SettingValue>): void;
   init?(context: PluginContext): void | Promise<void>;
@@ -290,6 +302,7 @@ export type ProxyAwareFetch = (
 export interface TransportContext {
   proxyUrl?: string;
   fetch: ProxyAwareFetch;
+  useCache: UseCache;
 }
 
 export interface TransportWsSocket {
@@ -309,6 +322,7 @@ export interface Transport {
   displayName?: string;
   description?: string;
   timeoutMs?: number;
+  needsAppRestart?: boolean;
   settingsSchema?: SettingField[];
   configure?(settings: Record<string, SettingValue>): void;
   available(): boolean | Promise<boolean>;
@@ -344,6 +358,7 @@ export interface QueryInterceptor {
   description: string;
   settingsId?: string;
   isClientExposed?: boolean;
+  needsAppRestart?: boolean;
   settingsSchema?: SettingField[];
   priority?: number;
   configure?(settings: Record<string, SettingValue>): void;

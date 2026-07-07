@@ -1,4 +1,5 @@
 import { escapeHtml } from "../../utils/dom";
+import { SERVER_SETTINGS_PRESETS } from "./presets";
 
 const t = window.scopedT("core");
 
@@ -10,6 +11,50 @@ const _h = (headingKey: string, icon: string): string =>
 
 const _desc = (key: string): string =>
   `<p class="settings-desc">${escapeHtml(t(key))}</p>`;
+
+const _renderRestartSection = (): string => `
+  <section class="settings-section ext-card degoog-panel degoog-panel--ext-card" id="settings-section-restart">
+    ${_h("settings-page.server.restart-heading", "fa-solid fa-power-off")}
+    ${_desc("settings-page.server.restart-desc")}
+    <button class="btn btn--secondary degoog-btn degoog-btn--secondary" id="settings-server-restart" type="button">
+      ${escapeHtml(t("settings-page.server.restart-button"))}
+    </button>
+  </section>`;
+
+const _renderPresetSection = (): string => `
+  <section class="settings-section ext-card degoog-panel degoog-panel--ext-card settings-server-presets" id="settings-section-server-presets">
+    ${_h("settings-page.server.presets.heading", "fa-solid fa-sliders")}
+    ${_desc("settings-page.server.presets.desc")}
+    <div class="settings-fieldset">
+      <label for="settings-server-preset-select" class="settings-proxy-urls-label">${escapeHtml(t("settings-page.server.presets.select-label"))}</label>
+      <div class="degoog-select-wrap">
+        <select id="settings-server-preset-select" class="settings-server-preset-select degoog-input">
+          <option value="">${escapeHtml(t("settings-page.server.presets.select-placeholder"))}</option>
+          ${SERVER_SETTINGS_PRESETS.map(
+            (preset) =>
+              `<option value="${escapeHtml(preset.id)}">${escapeHtml(t(preset.labelKey))}</option>`,
+          ).join("")}
+        </select>
+      </div>
+      <div class="settings-server-preset-preview" id="settings-server-preset-preview" hidden>
+        <p class="settings-desc" id="settings-server-preset-description"></p>
+        <div class="settings-server-preset-block" id="settings-server-preset-warnings" hidden>
+          <strong class="settings-server-preset-title">${escapeHtml(t("settings-page.server.presets.warnings-heading"))}</strong>
+          <ul class="settings-server-preset-list" id="settings-server-preset-warning-list"></ul>
+        </div>
+        <div class="settings-server-preset-block">
+          <strong class="settings-server-preset-title">${escapeHtml(t("settings-page.server.presets.changes-heading"))}</strong>
+          <ul class="settings-server-preset-list" id="settings-server-preset-change-list"></ul>
+        </div>
+        <div class="settings-server-preset-actions">
+          <button class="btn btn--primary degoog-btn degoog-btn--primary" id="settings-server-preset-apply" type="button">
+            ${escapeHtml(t("settings-page.server.presets.apply"))}
+          </button>
+          <span class="settings-server-preset-status" id="settings-server-preset-status" role="status" aria-live="polite"></span>
+        </div>
+      </div>
+    </div>
+  </section>`;
 
 const _toggle = (
   id: string,
@@ -51,7 +96,7 @@ const _renderApiKeySection = (): string => `
     ${_h("settings-page.server.api-key-heading", "fa-solid fa-key")}
     ${_desc("settings-page.server.api-key-desc")}
     <div class="settings-toggle-wrap settings-desc degoog-toggle-wrap">
-      <div id="settings-api-key-controls" class="settings-api-wrapper" hidden>
+      <div id="settings-api-key-controls" class="settings-api-wrapper" style="display:none">
         <code id="settings-api-key-value" class="settings-toggle-label"></code>
         <div>
           <button type="button" id="settings-api-key-reveal" class="btn btn--secondary degoog-btn degoog-btn--secondary" aria-label="${escapeHtml(t("settings-page.server.api-key-reveal"))}"><i class="fa-solid fa-eye fa-lg"></i></button>
@@ -63,7 +108,7 @@ const _renderApiKeySection = (): string => `
         ${escapeHtml(t("settings-page.server.api-key-no-password"))}
       </p>
     </div>
-    <fieldset class="settings-fieldset">
+    <fieldset class="settings-fieldset" id="settings-api-key-toggles" style="display:none">
       ${_toggle("settings-api-key-search-enabled", "settings-page.server.api-key-search-enable", { aria: "settings-page.server.api-key-search-aria", title: "settings-page.server.api-key-search-tooltip" })}
       ${_toggle("settings-api-key-suggest-enabled", "settings-page.server.api-key-suggest-enable", { aria: "settings-page.server.api-key-suggest-aria", title: "settings-page.server.api-key-suggest-tooltip" })}
     </fieldset>
@@ -87,6 +132,7 @@ const _renderStreamingSection = (): string => `
       ${_toggle("settings-streaming-enabled", "settings-page.server.streaming-enable", { aria: "settings-page.server.streaming-enable-aria", title: "settings-page.server.streaming-enable-tooltip" })}
       <div class="settings-streaming-options" id="settings-streaming-options" style="display: none">
         <fieldset class="settings-fieldset settings-fieldset--compact">
+          <div id="settings-streaming-type-checks" class="settings-streaming-type-checks"></div>
           ${_toggle("settings-streaming-auto-retry", "settings-page.server.streaming-auto-retry", { aria: "settings-page.server.streaming-auto-retry-aria" })}
           <div class="settings-streaming-retry-wrap settings-fieldset settings-fieldset-inverse settings-fieldset--compact" id="settings-streaming-retry-wrap" style="display: none">
             <label for="settings-streaming-max-retries" class="settings-proxy-urls-label">${escapeHtml(t("settings-page.server.streaming-max-retries-label"))}</label>
@@ -274,6 +320,8 @@ const _renderCustomCssSection = (): string => `
 
 export const renderServerContent = (): string =>
   [
+    _renderRestartSection(),
+    _renderPresetSection(),
     _renderCacheSection(),
     _renderApiKeySection(),
     _renderIndexerSection(),

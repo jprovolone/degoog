@@ -32,6 +32,7 @@
       "videos": "Videos",
       "news": "News",
       "options": "Options",
+      "filter": "Filter",
       "time": "Time",
       "any-time": "Any time",
       "language": "Language",
@@ -47,11 +48,16 @@
       "filter-languages": "Filter languages..."
     },
     "image-filters": {
+      "title": "Filters",
+      "default": "Default",
+      "toggle": "Filters",
+      "close": "Close filters",
       "size": "Size",
       "color": "Color",
       "type": "Type",
       "layout": "Layout",
-      "nsfw": "NSFW",
+      "nsfw": "Safe mode",
+      "transparent": "Transparent",
       "small": "Small",
       "medium": "Medium",
       "large": "Large",
@@ -84,6 +90,24 @@
     "search-failed": "Search failed. Please try again.",
     "no-engines": "No search engines installed. {store} to browse and install some.",
     "no-engines-store": "Go to the Store",
+    "sidebar": {
+      "engine-performance": "Engine Performance",
+      "people-also-search": "People also search for",
+      "info": "Info",
+      "results": "{count} results",
+      "retry": "retry",
+      "retrying": "retrying...",
+      "failure-reasons": {
+        "blocked": "Blocked by the engine",
+        "rate_limited": "Rate limited",
+        "captcha": "CAPTCHA challenge",
+        "parse_error": "Could not read the response",
+        "timeout": "Timed out",
+        "network": "Network error",
+        "interstitial": "Blocked by an interstitial page",
+        "unknown": "No usable response from this engine"
+      }
+    },
     "result": {
       "just-indexed": "just indexed",
       "insecure": "Insecure",

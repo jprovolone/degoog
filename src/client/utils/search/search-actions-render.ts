@@ -4,13 +4,15 @@ import {
   skeletonResults,
   skeletonSidebar,
 } from "../../animations/skeleton";
-import { closeMediaPreview } from "../../modules/media/media";
+import { closeMediaPreview, syncMediaPreviewPanel } from "../../modules/media/media";
 import {
   clearSlotPanels,
   renderResults,
   renderSidebar,
+  renderSidebarSuggestions,
+  prependKnowledgePanels,
 } from "../../modules/renderer/render";
-import { renderMediaEngineBar } from "../../modules/renderer/render-media";
+import { renderImgEngines } from "../../modules/filters/image-filters";
 import { state } from "../../state";
 import { SlotPanelPosition, type SearchResponse } from "../../types";
 import { abortAcReq, hideAcDropdown } from "../autocomplete";
@@ -25,8 +27,29 @@ import {
 import { isImageSearchType } from "../engines";
 import { imgFilterRecord } from "../url";
 import { getBase } from "../base-url";
+import { fetchSidebarSuggestions } from "./sidebar-suggestions";
 
 type Navigate = (query: string) => void;
+
+let sidebarSuggestionsController: AbortController | null = null;
+
+export const loadSidebarSuggestions = (
+  query: string,
+  type: string,
+  navigate: Navigate,
+): void => {
+  sidebarSuggestionsController?.abort();
+  state.currentRelatedSearches = [];
+  if (isImageSearchType(type) || !state.displaySearchSuggestions) return;
+
+  const ac = new AbortController();
+  sidebarSuggestionsController = ac;
+  void fetchSidebarSuggestions(query, ac.signal).then((terms) => {
+    if (sidebarSuggestionsController !== ac || state.currentQuery !== query) return;
+    state.currentRelatedSearches = terms;
+    renderSidebarSuggestions(terms, navigate);
+  });
+};
 
 export const prepareResultsUi = (query: string, resolvedType: string): void => {
   const isImageType = isImageSearchType(resolvedType);
@@ -53,6 +76,7 @@ export const prepareResultsUi = (query: string, resolvedType: string): void => {
   } else {
     layout?.classList.remove("media-mode");
   }
+  syncMediaPreviewPanel(isImageType);
   const resultsMeta = document.getElementById("results-meta");
   if (resultsMeta) resultsMeta.textContent = "Searching...";
   clearSlotPanels();
@@ -60,7 +84,10 @@ export const prepareResultsUi = (query: string, resolvedType: string): void => {
     abortGlancePanels();
     abortSlotPanels();
   } else if (resolvedType === "web") {
-    void fetchSlotPanels(query);
+    void fetchSlotPanels(query).then((panels) => {
+      const kp = panels.filter((p) => p.position === SlotPanelPosition.KnowledgePanel);
+      if (kp.length > 0) prependKnowledgePanels(kp);
+    });
     void fetchGlancePanels(query);
   }
   const glanceEl = document.getElementById("at-a-glance");
@@ -132,7 +159,7 @@ export const renderSearchResponse = (
 
   if (isImageType) {
     if (glanceEl) glanceEl.innerHTML = "";
-    renderMediaEngineBar(data.engineTimings ?? []);
+    renderImgEngines(data.engineTimings ?? []);
     if (sidebar) sidebar.innerHTML = "";
   } else if (type === "web") {
     if (opts.fetchGlance) void fetchGlancePanels(query, data.results);

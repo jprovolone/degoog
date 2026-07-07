@@ -1,4 +1,5 @@
 import type { ExtensionStoreType } from "./extension";
+import type { ShortcutBinding, ShortcutKind } from "../../shared/shortcuts";
 
 export interface RepoInfo {
   url: string;
@@ -32,10 +33,13 @@ export interface StoreItem {
   pluginType?: string;
   engineType?: string;
   engineTypes?: string[];
+  shortcutBinding?: ShortcutBinding;
+  shortcutKind?: ShortcutKind;
   minDegoogVersion?: string;
   requiresNewerVersion?: boolean;
   orphaned?: boolean;
   untracked?: boolean;
+  needsAppRestart?: boolean;
 }
 
 export interface InstalledItem {
@@ -93,6 +97,14 @@ export interface RepoPackageJson {
   }>;
   "repo-image"?: string;
   autocomplete?: Array<{
+    path: string;
+    name: string;
+    description?: string;
+    version?: string;
+    dependencies?: string[];
+    minDegoogVersion?: string;
+  }>;
+  shortcuts?: Array<{
     path: string;
     name: string;
     description?: string;

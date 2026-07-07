@@ -1,6 +1,7 @@
 import {
   type EngineConfig,
   type ExtensionMeta,
+  type ImageFilter,
   type SearchEngine,
   type SettingField,
   type Translate,
@@ -27,6 +28,9 @@ import { createRegistry, type RegistrySource } from "../registry-factory";
 import { extensionReadmeExists } from "../../utils/extension-docs";
 import { logger } from "../../utils/logger";
 import { getInstanceSettings } from "../../utils/server-settings";
+import { DEGOOG_ENGINE_ID } from "./builtins/degoog";
+import type { EngineFilters } from "../../../shared/engine-filters";
+import { isExtensionRestartFlagVisible } from "../../utils/restart-state";
 
 const builtinsDir = join(import.meta.dir, "builtins");
 
@@ -48,6 +52,7 @@ export interface EngineCatalogEntry {
   disabledByDefault?: boolean;
   searchTypes: EngineSearchType[];
   primaryType: EngineSearchType;
+  filters?: EngineFilters;
 }
 
 interface PluginEntry {
@@ -58,6 +63,7 @@ interface PluginEntry {
   instance: SearchEngine;
   disabledByDefault?: boolean;
   source?: RegistrySource;
+  filters?: EngineFilters;
 }
 
 const resolveTypes = (
@@ -74,8 +80,6 @@ const resolveTypes = (
 
 export const primaryType = (types: string[]): string =>
   types.length > 0 ? types[0] : "web";
-
-const DEGOOG_ENGINE_ID = "degoog-engine";
 
 const isEngineEnabled = (
   id: string,
@@ -110,6 +114,17 @@ const _coerceTypeList = (raw: unknown): string[] => {
   return [];
 };
 
+const _coerceFilters = (raw: unknown): EngineFilters | undefined => {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw))
+    return undefined;
+  const out: EngineFilters = {};
+  for (const [group, values] of Object.entries(raw as Record<string, unknown>)) {
+    const list = _coerceTypeList(values);
+    if (list.length > 0) out[group] = list;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+};
+
 const _resolving = new Set<string>();
 
 const resolveEngineTypes = async (entry: PluginEntry): Promise<string[]> => {
@@ -123,20 +138,21 @@ const resolveEngineTypes = async (entry: PluginEntry): Promise<string[]> => {
 const computeEngineTypes = async (entry: PluginEntry): Promise<string[]> => {
   const override = await getTypeOverride(entry.id);
   const dyn = (entry.instance as SearchEngine & { __typeFn?: TypeFn }).__typeFn;
-  let base: string[] = entry.searchTypes;
+
   if (dyn && !_resolving.has(entry.id)) {
     _resolving.add(entry.id);
     try {
       const result = await dyn();
-      base = _coerceTypeList(result);
-      if (base.length === 0) base = entry.searchTypes;
+      return resolveTypes(_coerceTypeList(result), override);
     } catch (err) {
       logger.warn("engines", `dynamic type() failed for ${entry.id}`, err);
     } finally {
       _resolving.delete(entry.id);
     }
   }
-  return resolveTypes(base.length > 0 ? base : ["web"], override);
+
+  const base = entry.searchTypes.length > 0 ? entry.searchTypes : ["web"];
+  return resolveTypes(base, override);
 };
 
 const isSearchEngine = (val: unknown): val is SearchEngine => {
@@ -175,6 +191,7 @@ const engineRegistry = createRegistry<PluginEntry>({
       searchTypes: declared.length > 0 ? declared : isFn ? [] : ["web"],
       description:
         typeof mod.description === "string" ? mod.description : undefined,
+      filters: _coerceFilters(mod.filters),
       instance,
     };
   },
@@ -206,6 +223,7 @@ export const listEngines = async (): Promise<EngineCatalogEntry[]> =>
         disabledByDefault: e.disabledByDefault,
         searchTypes,
         primaryType: primaryType(searchTypes),
+        filters: e.filters,
       };
     }),
   );
@@ -213,9 +231,22 @@ export const listEngines = async (): Promise<EngineCatalogEntry[]> =>
 export const getEngineMap = (): Record<string, SearchEngine> =>
   Object.fromEntries(engineRegistry.items().map((e) => [e.id, e.instance]));
 
+export const honorsImageFilters = (
+  filters: EngineFilters | undefined,
+  imageFilter?: ImageFilter,
+): boolean => {
+  const active = Object.entries(
+    (imageFilter ?? {}) as Record<string, string | undefined>,
+  ).filter(([, value]) => value && value !== "any") as [string, string][];
+  if (active.length === 0) return true;
+  if (!filters) return false;
+  return active.every(([group, value]) => (filters[group] ?? []).includes(value));
+};
+
 export const getEnginesForCustomType = async (
   engineType: string,
   config?: EngineConfig,
+  imageFilter?: ImageFilter,
 ): Promise<{ id: string; instance: SearchEngine }[]> => {
   const results: { id: string; instance: SearchEngine }[] = [];
   const settings = await getInstanceSettings();
@@ -224,6 +255,7 @@ export const getEnginesForCustomType = async (
     const enabled = !config || isEngineEnabled(e.id, config, indexerOn);
     if (!enabled) continue;
     if (await isDisabled(e.id)) continue;
+    if (!honorsImageFilters(e.filters, imageFilter)) continue;
     const types = await resolveEngineTypes(e);
     if (types.includes(engineType))
       results.push({ id: e.id, instance: e.instance });
@@ -354,6 +386,19 @@ const OUTGOING_TRANSPORT_FIELD: SettingField = {
   advanced: true,
 };
 
+export const ENGINE_TIMEOUT_MS = 10_000;
+
+const TIMEOUT_FIELD: SettingField = {
+  key: "timeoutMs",
+  label: "Timeout (ms)",
+  type: "number",
+  default: "",
+  placeholder: String(ENGINE_TIMEOUT_MS),
+  description:
+    "Maximum time in milliseconds to wait for this engine before giving up. Leave blank to use the default.",
+  advanced: true,
+};
+
 const CUSTOM_USER_AGENTS_FIELD: SettingField = {
   key: "customUserAgents",
   label: "Custom user agents",
@@ -435,8 +480,23 @@ export const getEngineExtensionMeta = async (
       }
     : OUTGOING_TRANSPORT_FIELD;
 
+  const timeoutField = coreT
+    ? {
+        ...TIMEOUT_FIELD,
+        label:
+          coreT("settings-page.schema.timeout.label") || TIMEOUT_FIELD.label,
+        description:
+          coreT("settings-page.schema.timeout.description") ||
+          TIMEOUT_FIELD.description,
+      }
+    : TIMEOUT_FIELD;
+
+  const settings = await getInstanceSettings();
+  const indexerOn = asBoolean(settings.degoogIndexerEnabled);
+
   const defaults = getDefaultEngineConfig();
   for (const entry of items) {
+    if (entry.id === DEGOOG_ENGINE_ID && !indexerOn) continue;
     const instance = engineMap[entry.id];
     const engineSchema = instance?.settingsSchema ?? [];
 
@@ -512,6 +572,7 @@ export const getEngineExtensionMeta = async (
     const schema: SettingField[] = [
       scoreField,
       transportField,
+      timeoutField,
       CUSTOM_USER_AGENTS_FIELD,
       PROXY_OVERRIDE_ENABLED_FIELD,
       PROXY_OVERRIDE_URLS_FIELD,
@@ -535,6 +596,7 @@ export const getEngineExtensionMeta = async (
       extensionDocsAvailable: exists,
       defaultEnabled: defaults[entry.id],
       source: entry.source,
+      needsAppRestart: isExtensionRestartFlagVisible(instance?.needsAppRestart),
     });
   }
 
