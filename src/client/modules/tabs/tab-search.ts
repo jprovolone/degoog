@@ -16,14 +16,15 @@ import {
   performStreamingSearch,
 } from "../../utils/streaming-search";
 import { renderTemplate } from "../../utils/template";
-import { closeMediaPreview, destroyMediaObserver, setupMediaObserver } from "../media/media";
+import { closeMediaPreview, destroyMediaObserver, setupMediaObserver, syncMediaPreviewPanel } from "../media/media";
 import {
   buildResultContext,
   clearSlotPanels,
   renderResults,
   renderSidebar,
+  prependKnowledgePanels,
 } from "../renderer/render";
-import { renderMediaEngineBar } from "../renderer/render-media";
+import { renderImgEngines } from "../filters/image-filters";
 import { getBase } from "../../utils/base-url";
 
 export async function performTabSearch(
@@ -87,7 +88,10 @@ export async function performTabSearch(
   if (glanceEl) glanceEl.innerHTML = "";
   clearSlotPanels();
   if (!isImageType) {
-    void fetchSlotPanels(query);
+    void fetchSlotPanels(query).then((panels) => {
+      const kp = panels.filter((p) => p.position === SlotPanelPosition.KnowledgePanel);
+      if (kp.length > 0) prependKnowledgePanels(kp);
+    });
     void fetchGlancePanels(query);
   }
   document.title = `${query} - degoog`;
@@ -97,6 +101,7 @@ export async function performTabSearch(
     if (isImageType) layout.classList.add("media-mode");
     else layout.classList.remove("media-mode");
   }
+  syncMediaPreviewPanel(isImageType);
 
   const urlParams = new URLSearchParams({ q: query, type: `tab:${tabId}` });
   if (page > 1) urlParams.set("page", String(page));
@@ -151,7 +156,7 @@ export async function performTabSearch(
     state.currentData = currentData;
 
     if (isImageType) {
-      renderMediaEngineBar(timings);
+      renderImgEngines(timings);
       renderResults(data.results || []);
       setupMediaObserver("images");
       return;

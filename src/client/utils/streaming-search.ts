@@ -9,14 +9,17 @@ import {
   closeMediaPreview,
   destroyMediaObserver,
   setupMediaObserver,
+  syncMediaPreviewPanel,
 } from "../modules/media/media";
 import {
   attachVideoPlayers,
   clearSlotPanels,
   renderPagination,
   renderSidebar,
+  prependKnowledgePanels,
 } from "../modules/renderer/render";
-import { appendMediaCards, renderMediaEngineBar } from "../modules/renderer/render-media";
+import { renderImageGrid } from "../modules/renderer/render-media";
+import { renderImgEngines } from "../modules/filters/image-filters";
 import { state } from "../state";
 import {
   EngineTiming,
@@ -36,6 +39,8 @@ import {
 import { buildSearchUrl, imgFilterRecord } from "./url";
 import { appendSearchAuthParams } from "./request";
 import { getBase } from "./base-url";
+import { loadSidebarSuggestions } from "./search/search-actions-render";
+import { mergeStreamingMediaResults } from "./search/streaming-media-results";
 
 const t = window.scopedT("themes/degoog");
 import {
@@ -117,6 +122,7 @@ export async function performStreamingSearch(
   } else {
     layout?.classList.remove("media-mode");
   }
+  syncMediaPreviewPanel(isImageType);
   const resultsMeta = document.getElementById("results-meta");
   if (resultsMeta) resultsMeta.textContent = "Searching...";
   const resultsList = document.getElementById("results-list");
@@ -129,12 +135,16 @@ export async function performStreamingSearch(
   if (pagination) pagination.innerHTML = "";
   const sidebar = document.getElementById("results-sidebar");
   if (sidebar) sidebar.innerHTML = isImageType ? "" : skeletonSidebar();
+  loadSidebarSuggestions(query, type, onComplete);
   clearSlotPanels();
   if (isImageType) {
     abortGlancePanels();
     abortSlotPanels();
   } else if (type === "web") {
-    void fetchSlotPanels(query);
+    void fetchSlotPanels(query).then((panels) => {
+      const kp = panels.filter((p) => p.position === SlotPanelPosition.KnowledgePanel);
+      if (kp.length > 0) prependKnowledgePanels(kp);
+    });
     void fetchGlancePanels(query);
   }
   const glanceEl = document.getElementById("at-a-glance");
@@ -197,18 +207,15 @@ export async function performStreamingSearch(
             '<div class="image-grid"></div><div class="media-scroll-sentinel"></div>';
         }
       }
-      const grid = resultsList?.querySelector<HTMLElement>(".image-grid");
-      const fresh: ScoredResult[] = [];
-      for (const r of data.results) {
-        if (!renderedUrls.has(r.url)) {
-          renderedUrls.add(r.url);
-          fresh.push(r);
-          renderedImages.push(r);
-        }
-      }
+      for (const r of data.results) renderedUrls.add(r.url);
+      renderedImages.splice(
+        0,
+        renderedImages.length,
+        ...mergeStreamingMediaResults(renderedImages, data.results),
+      );
       currentResults = renderedImages;
       state.currentResults = renderedImages;
-      if (grid && fresh.length) appendMediaCards(grid, fresh, "image");
+      if (resultsList) renderImageGrid(currentResults, resultsList);
     } else {
       currentResults = data.results;
       state.currentResults = currentResults;
@@ -225,7 +232,7 @@ export async function performStreamingSearch(
     }
 
     if (isImageType) {
-      renderMediaEngineBar(engineTimings);
+      renderImgEngines(engineTimings);
     } else {
       updateEngineTimings(sidebar, engineTimings);
     }
@@ -263,7 +270,7 @@ export async function performStreamingSearch(
     }
 
     if (isImageType) {
-      renderMediaEngineBar(data.engineTimings);
+      renderImgEngines(data.engineTimings);
       if (sidebar) sidebar.innerHTML = "";
       if (currentResults.length > 0) setupMediaObserver("images");
     } else if (type === "web") {

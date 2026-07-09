@@ -1,4 +1,7 @@
 import type { AppState } from "./types";
+import type { ImageFilter } from "./types/search";
+
+export const defaultImageFilter = (): ImageFilter => ({});
 
 export const state: AppState = {
   currentQuery: "",
@@ -7,6 +10,7 @@ export const state: AppState = {
   lastPage: 10,
   currentResults: [],
   currentData: null,
+  currentRelatedSearches: [],
   imagePage: 1,
   imageLastPage: 10,
   videoPage: 1,
@@ -22,6 +26,7 @@ export const state: AppState = {
   displaySearchSuggestions: true,
   postMethodEnabled: false,
   inlineGifPlayback: true,
+  stickySidebar: false,
   isInitialLoad: false,
-  imageFilter: {},
+  imageFilter: defaultImageFilter(),
 };

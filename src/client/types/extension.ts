@@ -1,3 +1,5 @@
+import type { EngineFilters } from "../../shared/engine-filters";
+
 export type SettingFieldType =
   | "text"
   | "number"
@@ -7,6 +9,7 @@ export type SettingFieldType =
   | "textarea"
   | "select"
   | "urllist"
+  | "list"
   | "info";
 
 export interface SettingField {
@@ -22,6 +25,8 @@ export interface SettingField {
   default?: string;
   advanced?: boolean;
   visibleWhen?: { key: string; equals: string };
+  itemSchema?: SettingField[];
+  addLabel?: string;
 }
 
 export interface ExtensionMeta {
@@ -41,6 +46,7 @@ export interface ExtensionMeta {
   defaultFeedUrls?: string[];
   isClientExposed?: boolean;
   requiresNewerVersion?: boolean;
+  needsAppRestart?: boolean;
 }
 
 export interface AllExtensions {
@@ -49,6 +55,7 @@ export interface AllExtensions {
   themes: ExtensionMeta[];
   transports: ExtensionMeta[];
   autocomplete: ExtensionMeta[];
+  shortcuts: ExtensionMeta[];
 }
 
 export interface SearchBarAction {
@@ -75,6 +82,7 @@ export interface EngineRegistry {
     primaryType: string;
     searchTypes: string[];
     disabledByDefault?: boolean;
+    filters?: EngineFilters;
   }>;
   defaults?: Record<string, boolean>;
 }

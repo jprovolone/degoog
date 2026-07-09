@@ -3,6 +3,9 @@ import { openModal } from "../../modules/modals/settings-modal/modal";
 import type { ExtensionMeta, AllExtensions } from "../../types";
 import { getBase } from "../../utils/base-url";
 import { renderMdInline } from "../../utils/md";
+import { flashError, flashSuccess } from "../shared/flash-msg";
+import { initDragOrder } from "../../utils/drag-order";
+import { extCardRestartWarning } from "../shared/ext-card";
 
 const t = window.scopedT("core");
 
@@ -32,6 +35,7 @@ const _renderPluginCard = (
       ? `<span class="degoog-badge">Built-in</span>`
       : "";
   const exposureIcon = _exposureIcon(plugin);
+  const restartWarning = extCardRestartWarning(plugin);
   const desc = plugin.description
     ? `<span class="ext-card-desc">${renderMdInline(plugin.description)}</span>`
     : "";
@@ -60,10 +64,7 @@ const _renderPluginCard = (
     : "";
 
   const orderBtns = orderable
-    ? `<div class="degoog-card-order">
-        <button class="degoog-icon-btn degoog-card-order-btn" data-id="${escapeHtml(plugin.id)}" data-dir="up" title="Move up" type="button"><i class="fa-solid fa-chevron-up"></i></button>
-        <button class="degoog-icon-btn degoog-card-order-btn" data-id="${escapeHtml(plugin.id)}" data-dir="down" title="Move down" type="button"><i class="fa-solid fa-chevron-down"></i></button>
-      </div>`
+    ? `<span class="degoog-drag-handle" data-drag-handle tabindex="0" role="button" title="${escapeHtml(t("settings-page.extensions.drag-to-reorder"))}" aria-label="${escapeHtml(t("settings-page.extensions.drag-to-reorder"))}"><i class="fa-solid fa-grip-vertical"></i></span>`
     : "";
 
   return `
@@ -72,6 +73,7 @@ const _renderPluginCard = (
         <div class="ext-card-info">
           <div class="ext-card-name-row">
             ${exposureIcon}
+            ${restartWarning}
             <label for="plugin-toggle-${escapeHtml(plugin.id)}" class="ext-card-name plugin-toggle-label">${escapeHtml(plugin.displayName)}</label>
             ${builtinBadge}
           </div>
@@ -86,16 +88,6 @@ const _renderPluginCard = (
         </div>
       </div>
     </div>`;
-};
-
-const _refreshOrderBtns = (group: HTMLElement): void => {
-  const cards = group.querySelectorAll<HTMLElement>(".ext-card");
-  cards.forEach((card, i) => {
-    const up = card.querySelector<HTMLButtonElement>('[data-dir="up"]');
-    const down = card.querySelector<HTMLButtonElement>('[data-dir="down"]');
-    if (up) up.disabled = i === 0;
-    if (down) down.disabled = i === cards.length - 1;
-  });
 };
 
 const _savePriorities = async (group: HTMLElement): Promise<void> => {
@@ -123,25 +115,36 @@ const _bindCards = (
   all: ExtensionMeta[],
 ): void => {
   container
-    .querySelectorAll<HTMLElement>(".ext-cards--orderable")
-    .forEach(_refreshOrderBtns);
-
-  container
     .querySelectorAll<HTMLInputElement>(".plugin-toggle-input")
     .forEach((input) => {
+      let reqToken = 0;
+      let confirmed = input.checked;
       input.addEventListener("change", async () => {
         const id = input.dataset.id;
         if (!id) return;
-        const disabled = !input.checked;
-        const res = await fetch(
-          `${getBase()}/api/extensions/${encodeURIComponent(id)}/settings`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ disabled: disabled ? "true" : "" }),
-          },
-        );
-        if (res.ok) window.dispatchEvent(new CustomEvent("extensions-saved"));
+        const intended = input.checked;
+        const disabled = !intended;
+        const token = ++reqToken;
+        try {
+          const res = await fetch(
+            `${getBase()}/api/extensions/${encodeURIComponent(id)}/settings`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ disabled: disabled ? "true" : "" }),
+            },
+          );
+          if (!res.ok) throw new Error("save failed");
+          if (token !== reqToken) return;
+          confirmed = intended;
+          window.dispatchEvent(new CustomEvent("extensions-saved"));
+          flashSuccess(t("settings-page.server.saved"));
+        } catch (err) {
+          console.warn("[settings] plugin toggle failed", err);
+          if (token !== reqToken) return;
+          input.checked = confirmed;
+          flashError(t("settings-page.server.save-failed-network"));
+        }
       });
     });
 
@@ -154,25 +157,6 @@ const _bindCards = (
         if (ext) openModal(ext);
       });
     });
-
-  container
-    .querySelectorAll<HTMLButtonElement>(".degoog-card-order-btn")
-    .forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const card = btn.closest<HTMLElement>(".ext-card");
-        const cardsEl = btn.closest<HTMLElement>(".ext-cards--orderable");
-        if (!card || !cardsEl) return;
-        if (btn.dataset.dir === "up") {
-          const prev = card.previousElementSibling as HTMLElement | null;
-          if (prev) cardsEl.insertBefore(card, prev);
-        } else {
-          const next = card.nextElementSibling as HTMLElement | null;
-          if (next) cardsEl.insertBefore(next, card);
-        }
-        _refreshOrderBtns(cardsEl);
-        void _savePriorities(cardsEl);
-      });
-    });
 };
 
 const _renderCards = (
@@ -182,7 +166,6 @@ const _renderCards = (
   let html = "";
   for (const plugin of plugins) html += _renderPluginCard(plugin, true);
   cardsEl.innerHTML = html;
-  _refreshOrderBtns(cardsEl);
 };
 
 let _pluginSearchQuery = "";
@@ -202,6 +185,12 @@ export function initPluginsTab(allExtensions: AllExtensions): void {
     <div class="ext-group"><div class="ext-cards ext-cards--orderable"></div></div>`;
 
   const cardsEl = container.querySelector<HTMLElement>(".ext-cards--orderable")!;
+
+  initDragOrder(cardsEl, {
+    itemSelector: ".ext-card",
+    handleSelector: "[data-drag-handle]",
+    onReorder: (list) => void _savePriorities(list),
+  });
 
   const applyFilter = (q: string): void => {
     const filtered = q
