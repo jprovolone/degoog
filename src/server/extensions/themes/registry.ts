@@ -46,13 +46,11 @@ export interface LoadedTheme {
 
 import { themesDir } from "../../utils/paths";
 import { bootCircuitFromPath } from "../../utils/translation-circuit";
+import { refreshModules } from "../../utils/module-cache";
 import { buildExtensionMeta } from "../extension-meta";
 import { makeExtID, rewriteThemePaths } from "../../utils/extension-id";
 
-const THEMES_DIR = themesDir();
-
 let themes: LoadedTheme[] = [];
-let activeThemeId: string | null = null;
 
 export function getThemeSettingsId(themeId: string): string {
   return makeExtID(themeId, "theme");
@@ -84,16 +82,17 @@ async function saveActiveThemeId(id: string | null): Promise<void> {
 }
 
 export async function initThemes(): Promise<void> {
-  themes = [];
+  const loaded: LoadedTheme[] = [];
 
   try {
-    await mkdir(THEMES_DIR, { recursive: true });
-    const entries = await readdir(THEMES_DIR, { withFileTypes: true });
+    const dir = themesDir();
+    await mkdir(dir, { recursive: true });
+    const entries = await readdir(dir, { withFileTypes: true });
 
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
 
-      const themeDir = join(THEMES_DIR, entry.name);
+      const themeDir = join(dir, entry.name);
       const manifestPath = join(themeDir, "theme.json");
 
       try {
@@ -115,9 +114,10 @@ export async function initThemes(): Promise<void> {
         };
 
         theme.compiledCss = await compileThemeCss(theme);
+        await refreshModules(manifestPath, themeDir, true);
         theme.t = await bootCircuitFromPath(themeDir);
 
-        themes.push(theme);
+        loaded.push(theme);
       } catch (err) {
         logger.debug("themes", `Failed to load theme: ${entry.name}`, err);
       }
@@ -126,10 +126,10 @@ export async function initThemes(): Promise<void> {
     logger.debug("themes", "Failed to read themes directory", err);
   }
 
-  activeThemeId = await loadActiveThemeId();
+  themes = loaded;
 
-  if (activeThemeId && !themes.find((t) => t.id === activeThemeId)) {
-    activeThemeId = null;
+  const activeId = await loadActiveThemeId();
+  if (activeId && !getThemeById(activeId)) {
     await saveActiveThemeId(null);
   }
 }
@@ -138,18 +138,19 @@ export function getThemes(): LoadedTheme[] {
   return themes;
 }
 
-export function getActiveTheme(): LoadedTheme | null {
-  if (!activeThemeId) return null;
-  return themes.find((t) => t.id === activeThemeId) ?? null;
+export async function getActiveTheme(): Promise<LoadedTheme | null> {
+  const activeId = await loadActiveThemeId();
+  if (!activeId) return null;
+  return getThemeById(activeId);
 }
 
-export function getActiveThemeId(): string | null {
-  return activeThemeId;
+export async function getActiveThemeId(): Promise<string | null> {
+  const theme = await getActiveTheme();
+  return theme?.id ?? null;
 }
 
 export async function setActiveTheme(id: string | null): Promise<boolean> {
-  if (id !== null && !themes.find((t) => t.id === id)) return false;
-  activeThemeId = id;
+  if (id !== null && !getThemeById(id)) return false;
   await saveActiveThemeId(id);
   return true;
 }
@@ -168,7 +169,7 @@ export async function getThemeHtml(
     | "robots-takeover"
     | "404",
 ): Promise<string | null> {
-  const theme = getActiveTheme();
+  const theme = await getActiveTheme();
   if (!theme) return null;
   const htmlFile = theme.manifest.html?.[page];
   if (!htmlFile) return null;
@@ -206,7 +207,7 @@ export async function getThemeExtensionMeta(): Promise<ExtensionMeta[]> {
 }
 
 export async function getActiveThemeDataAttrs(): Promise<string> {
-  const theme = getActiveTheme();
+  const theme = await getActiveTheme();
   if (
     !theme?.manifest.dataAttrsFromSettings ||
     Object.keys(theme.manifest.dataAttrsFromSettings).length === 0
@@ -237,7 +238,7 @@ export async function getActiveThemeDataAttrs(): Promise<string> {
 }
 
 export async function getThemeTemplatesHtml(): Promise<string> {
-  const theme = getActiveTheme();
+  const theme = await getActiveTheme();
   if (!theme?.manifest.templates) return "";
   const parts: string[] = [];
   for (const [id, filePath] of Object.entries(theme.manifest.templates)) {
@@ -266,7 +267,5 @@ export async function recompileTheme(id: string): Promise<void> {
 }
 
 export async function reloadThemes(_bust = true): Promise<void> {
-  themes = [];
-  activeThemeId = null;
   await initThemes();
 }

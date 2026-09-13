@@ -8,7 +8,8 @@ import {
   withSearxLock,
 } from "../extensions/compatibility-layer/searx/install";
 import { isSearxCompatOn } from "../extensions/compatibility-layer/searx";
-import { reloadEngines } from "../extensions/engines/registry";
+import { ReloadMode, reloadSync } from "../extensions/store/reload-sync";
+import { ExtensionStoreType } from "../types";
 import { logger } from "../utils/logger";
 
 const NS = "searx-engines";
@@ -25,7 +26,7 @@ const _guard = async (c: Context): Promise<Response | null> => {
 
 const _refresh = async (code: string): Promise<void> => {
   try {
-    await reloadEngines();
+    await reloadSync(ExtensionStoreType.Engine, ReloadMode.Bust);
   } catch (err) {
     logger.warn(NS, `engine reload after ${code} failed, restart to pick it up`, err);
   }

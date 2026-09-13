@@ -1,3 +1,4 @@
+import { realpathSync } from "fs";
 import { join, resolve, sep } from "path";
 
 export const resolveContained = (
@@ -10,8 +11,33 @@ export const resolveContained = (
   return target;
 };
 
+export const resolveChild = (
+  root: string,
+  ...parts: string[]
+): string | null => {
+  const base = resolve(root);
+  const target = resolveContained(base, ...parts);
+  return target && target !== base ? target : null;
+};
+
+export const resolveRealChild = (
+  root: string,
+  ...parts: string[]
+): string | null => {
+  try {
+    const base = realpathSync(root);
+    const target = realpathSync(resolve(base, ...parts));
+    if (target === base || !resolveContained(base, target)) return null;
+    return target;
+  } catch {
+    return null;
+  }
+};
+
 const _dataDir = (): string =>
   process.env.DEGOOG_DATA_DIR ?? join(process.cwd(), "data");
+
+export const busDir = (): string => join(_dataDir(), "bus");
 
 export const pluginsDir = (): string =>
   process.env.DEGOOG_PLUGINS_DIR ?? join(_dataDir(), "plugins");

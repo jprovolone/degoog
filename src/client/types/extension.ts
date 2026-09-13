@@ -1,5 +1,5 @@
 import type { EngineFilters } from "../../shared/engine-filters";
-import type { FieldOptionsSource } from "../../shared/field-options";
+import type { SettingField } from "../../shared/setting-field";
 
 export type {
   FieldOption,
@@ -7,45 +7,7 @@ export type {
   FieldOptionsSource,
 } from "../../shared/field-options";
 
-export type SettingFieldType =
-  | "text"
-  | "number"
-  | "password"
-  | "url"
-  | "toggle"
-  | "textarea"
-  | "select"
-  | "urllist"
-  | "list"
-  | "hex"
-  | "range"
-  | "file"
-  | "info";
-
-export interface SettingField {
-  key: string;
-  label: string;
-  type: SettingFieldType;
-  required?: boolean;
-  placeholder?: string;
-  description?: string;
-  secret?: boolean;
-  options?: string[];
-  optionLabels?: string[];
-  default?: string;
-  advanced?: boolean;
-  visibleWhen?: { key: string; equals: string };
-  itemSchema?: SettingField[];
-  addLabel?: string;
-  fieldset?: string;
-  min?: string;
-  max?: string;
-  step?: string;
-  accept?: string;
-  maxSizeKb?: string;
-  minSizeKb?: string;
-  optionsFrom?: FieldOptionsSource;
-}
+export type { SettingFieldType, SettingField } from "../../shared/setting-field";
 
 export interface ExtensionMeta {
   id: string;
