@@ -4,9 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { clearServerSettingsCache } from "../../src/server/utils/server-settings";
 
-const ENGINES_MOD = "../../src/server/extensions/engines/registry";
+const SYNC_MOD = "../../src/server/extensions/store/reload-sync";
 
-const enginesReal = { ...(await import(ENGINES_MOD)) };
+const syncReal = { ...(await import(SYNC_MOD)) };
 
 const SAVED_ENV_KEYS = [
   "DEGOOG_DATA_DIR",
@@ -42,9 +42,9 @@ describe("POST /api/settings/field searx reload", () => {
     process.env.DEGOOG_DANGEROUSLY_NO_PASSWORD = "true";
     clearServerSettingsCache();
 
-    mock.module(ENGINES_MOD, () => ({
-      ...enginesReal,
-      reloadEngines: async () => {
+    mock.module(SYNC_MOD, () => ({
+      ...syncReal,
+      reloadSync: async () => {
         if (reloadFails) throw new Error("python went for a walk");
       },
     }));
@@ -53,7 +53,7 @@ describe("POST /api/settings/field searx reload", () => {
   });
 
   afterAll(() => {
-    mock.module(ENGINES_MOD, () => enginesReal);
+    mock.module(SYNC_MOD, () => syncReal);
     clearServerSettingsCache();
     rmSync(tempDir, { recursive: true, force: true });
     for (const [key, value] of savedEnv) {

@@ -79,8 +79,8 @@ const registry = createRegistry<ShortcutExtension>({
 });
 
 export const initShortcutsRegistry = registry.init;
-export const reloadShortcutsRegistry = (_bust = false): Promise<void> =>
-  registry.reload();
+export const reloadShortcutsRegistry = (bust = false): Promise<void> =>
+  bust ? registry.reload() : registry.refresh();
 export const getShortcutExtensions = (): ShortcutExtension[] => registry.items();
 
 export const getShortcutActions = (): ShortcutActionMeta[] =>

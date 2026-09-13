@@ -90,7 +90,7 @@ export async function getTranslator(
   themed = false,
 ): Promise<Translate> {
   const baseT = await getDefaultThemeTranslator();
-  const theme = getActiveTheme();
+  const theme = await getActiveTheme();
   const themeChain = themed && theme?.t ? withBuffer(theme.t, baseT) : baseT;
   const coreT = await getCoreTranslator();
   return withBuffer(themeChain, coreT);
@@ -102,10 +102,11 @@ function getTextDirection(locale: string): "rtl" | "ltr" {
   return isRTL ? "rtl" : "ltr";
 }
 
-function themeCssPlaceholder(): string {
-  const theme = getActiveTheme();
+async function themeCssPlaceholder(): Promise<string> {
+  const theme = await getActiveTheme();
   if (!theme?.manifest.css) return "";
-  return `<link rel="stylesheet" href="/theme/style.css?v=${pkg.version}">`;
+  const themeId = encodeURIComponent(theme.id);
+  return `<link rel="stylesheet" href="/theme/style.css?v=${pkg.version}&theme=${themeId}">`;
 }
 
 const customCssPlaceholder = async (): Promise<string> => {
@@ -162,7 +163,7 @@ export async function applyPagePlaceholders(
     ...getAllMiddlewareTranslators(),
     ...getAllSearchBarTranslators(),
   ];
-  const theme = getActiveTheme();
+  const theme = await getActiveTheme();
 
   if (theme?.t && theme.manifest?.name) {
     entries.push({
@@ -177,7 +178,7 @@ export async function applyPagePlaceholders(
 
   let result = html
     .replace("__LANG_ATTR__", resolvedLocale)
-    .replace("__THEME_CSS__", themeCssPlaceholder())
+    .replace("__THEME_CSS__", await themeCssPlaceholder())
     .replace("__THEME_ATTRS__", themeAttrs)
     .replace("__PLUGIN_ASSETS__", await pluginAssetsPlaceholder())
     .replace("__CUSTOM_CSS__", await customCssPlaceholder())

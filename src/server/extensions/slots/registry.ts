@@ -3,6 +3,7 @@ import {
   ExtensionStoreType,
   SlotPanelPosition,
   SLOT_POSITION_SETTING_KEY,
+  SLOT_SEARCH_TYPES_KEY,
   type ExtensionMeta,
   type SettingField,
   type SlotPlugin,
@@ -16,11 +17,15 @@ import {
   lockinNameSpace,
   lockinSettingsId,
 } from "../../utils/plugin-assets";
+import { extensionReadmeExists } from "../../utils/extension-docs";
 import { getSettings, isDisabled, maskSecrets } from "../../utils/plugin-settings";
 import { bootCircuitFromPath } from "../../utils/translation-circuit";
 import { createRegistry } from "../registry-factory";
 import { getInterceptors } from "../interceptors/registry";
 import { isPluginManifest } from "../plugin-manifest";
+import { getInstalledSearchTypes } from "../engines/registry";
+import { baseSlotTypes } from "../../utils/slot-types";
+import { parseTypeList } from "../../../shared/search-types";
 import { isExtensionRestartFlagVisible } from "../../utils/restart-state";
 
 const builtinsDir = join(
@@ -133,6 +138,7 @@ export const getSlotExtensionMeta = async (
 ): Promise<ExtensionMeta[]> => {
   const slots = getSlotPlugins();
   const out: ExtensionMeta[] = [];
+  const installedTypes = parseTypeList(await getInstalledSearchTypes());
 
   for (const slot of slots) {
     if (!slot.id) {
@@ -174,6 +180,25 @@ export const getSlotExtensionMeta = async (
       });
     }
 
+    const slotDefaults = baseSlotTypes(slot);
+    const typeOptions = [
+      ...new Set([...slotDefaults, ...installedTypes]),
+    ];
+
+    fullSchema.push({
+      key: SLOT_SEARCH_TYPES_KEY,
+      label: coreT
+        ? coreT("settings-page.schema.slot-search-types.label") || "Search types"
+        : "Search types",
+      type: "multiselect",
+      options: typeOptions,
+      default: slotDefaults.join(","),
+      description: coreT
+        ? coreT("settings-page.schema.slot-search-types.description") ||
+          "Which result tabs this slot renders on. Images are not supported."
+        : "Which result tabs this slot renders on. Images are not supported.",
+    });
+
     const id = slot.settingsId ?? slot.id;
     const raw = await getSettings(id);
     const settings = maskSecrets(raw, fullSchema);
@@ -190,6 +215,13 @@ export const getSlotExtensionMeta = async (
         : slot.position;
     }
 
+    const storedTypes = raw[SLOT_SEARCH_TYPES_KEY];
+    settings[SLOT_SEARCH_TYPES_KEY] = (
+      storedTypes === undefined ? slotDefaults : parseTypeList(storedTypes)
+    ).filter((type) => typeOptions.includes(type));
+
+    const { exists: docsExist } = await extensionReadmeExists(id);
+
     out.push({
       id,
       displayName: manifest?.name ?? slot.name,
@@ -201,6 +233,7 @@ export const getSlotExtensionMeta = async (
       source: getSlotSource(slot.id),
       isClientExposed: slot.isClientExposed,
       needsAppRestart: isExtensionRestartFlagVisible(slot.needsAppRestart),
+      extensionDocsAvailable: docsExist,
     });
   }
 

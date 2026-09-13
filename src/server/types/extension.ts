@@ -1,5 +1,6 @@
 import type { CreateCache, UseCache } from "../utils/cache";
 import type { SettingValue } from "../utils/plugin-settings";
+import type { ThreatLevel } from "../utils/sentinel";
 import type {
   SearchResult,
   ScoredResult,
@@ -7,16 +8,19 @@ import type {
   EngineContext,
 } from "./search";
 import { SlotPanelPosition } from "../../shared/search-types";
-import type {
-  FieldOptionsResult,
-  FieldOptionsSource,
-} from "../../shared/field-options";
+import type { FieldOptionsResult } from "../../shared/field-options";
+import type { SettingField } from "../../shared/setting-field";
 
 export type {
   FieldOption,
   FieldOptionsResult,
   FieldOptionsSource,
 } from "../../shared/field-options";
+
+export type {
+  SettingFieldType,
+  SettingField,
+} from "../../shared/setting-field";
 
 export type TranslationVars = string | number | boolean;
 export type TranslationRecord = {
@@ -54,50 +58,11 @@ export enum ExtensionStoreType {
   Shortcut = "shortcut",
 }
 
-
 export type GetFieldOptions = (
   key: string,
   values: Record<string, SettingValue>,
   signal?: AbortSignal,
 ) => Promise<FieldOptionsResult> | FieldOptionsResult;
-
-export interface SettingField {
-  key: string;
-  label: string;
-  type:
-  | "text"
-  | "number"
-  | "password"
-  | "url"
-  | "toggle"
-  | "textarea"
-  | "select"
-  | "urllist"
-  | "list"
-  | "hex"
-  | "range"
-  | "file"
-  | "info";
-  required?: boolean;
-  placeholder?: string;
-  description?: string;
-  secret?: boolean;
-  options?: string[];
-  optionLabels?: string[];
-  default?: string;
-  advanced?: boolean;
-  visibleWhen?: { key: string; equals: string };
-  itemSchema?: SettingField[];
-  addLabel?: string;
-  fieldset?: string;
-  min?: string;
-  max?: string;
-  step?: string;
-  accept?: string;
-  maxSizeKb?: string;
-  minSizeKb?: string;
-  optionsFrom?: FieldOptionsSource;
-}
 
 export interface PluginManifest {
   id: string;
@@ -192,6 +157,7 @@ export interface AutocompleteProvider {
 }
 
 export const SLOT_POSITION_SETTING_KEY = "slotPosition";
+export const SLOT_SEARCH_TYPES_KEY = "slotSearchTypes";
 
 export interface SlotPluginContext {
   clientIp?: string;
@@ -209,6 +175,7 @@ export interface SlotPlugin {
   description: string;
   position: SlotPanelPosition;
   slotPositions?: SlotPanelPosition[];
+  searchTypes?: string[];
   settingsId?: string;
   isClientExposed?: boolean;
   needsAppRestart?: boolean;
@@ -390,6 +357,20 @@ export interface QueryInterceptorContext {
   lang?: string;
 }
 
+export interface EngineRunReport {
+  engine: string;
+  engineId?: string;
+  searchType: string;
+  page: number;
+  time: number;
+  resultCount: number;
+  status: ThreatLevel;
+  errorReason?: string;
+  httpStatus?: number;
+  cached: boolean;
+  at: number;
+}
+
 export interface QueryInterceptor {
   name: string;
   description: string;
@@ -405,6 +386,7 @@ export interface QueryInterceptor {
     query: string,
     context?: QueryInterceptorContext,
   ): Promise<InterceptorResult>;
+  observe?(report: EngineRunReport): void | Promise<void>;
   t?: Translate;
   pluginManifest?: PluginManifest;
 }

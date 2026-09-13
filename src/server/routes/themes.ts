@@ -10,9 +10,9 @@ import { logger } from "../utils/logger";
 
 const router = new Hono();
 
-router.get("/api/themes", (c) => {
+router.get("/api/themes", async (c) => {
   const themes = getThemes();
-  const activeId = getActiveThemeId();
+  const activeId = await getActiveThemeId();
   return c.json({
     themes: themes.map((t) => ({
       id: t.id,
@@ -40,11 +40,12 @@ router.post("/api/theme/active", async (c) => {
   return c.json({ ok: true, activeId: body.id });
 });
 
-router.get("/theme/style.css", (c) => {
-  const theme = getActiveTheme();
+router.get("/theme/style.css", async (c) => {
+  const theme = await getActiveTheme();
   if (!theme?.compiledCss) return c.notFound();
   return c.body(theme.compiledCss, 200, {
     "Content-Type": "text/css; charset=utf-8",
+    "Cache-Control": "no-cache",
   });
 });
 
