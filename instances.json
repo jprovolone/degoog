@@ -1,0 +1,50 @@
+{
+  "$schema": "./instances.schema.json",
+  "version": 1,
+  "instances": [
+    {
+      "id": "degoog-org",
+      "name": "degoog.org",
+      "clearnet": [
+        "https://degoog.org"
+      ],
+      "tor": [],
+      "i2p": [],
+      "appearance": "default",
+      "theme": null
+    },
+    {
+      "id": "mirnir-com",
+      "name": "mirnir.com",
+      "clearnet": [
+        "https://mirnir.com"
+      ],
+      "tor": [],
+      "i2p": [],
+      "appearance": "default",
+      "theme": null
+    },
+    {
+      "id": "nepnir-com",
+      "name": "nepnir.com",
+      "clearnet": [
+        "https://nepnir.com"
+      ],
+      "tor": [],
+      "i2p": [],
+      "appearance": "custom",
+      "theme": "Zen"
+    },
+    {
+      "id": "degoog-ogservers-org",
+      "name": "degoog.ogservers.org",
+      "clearnet": [
+        "https://degoog.ogservers.org"
+      ],
+      "tor": [],
+      "i2p": [],
+      "appearance": "custom",
+      "theme": null
+    }
+  ]
+}

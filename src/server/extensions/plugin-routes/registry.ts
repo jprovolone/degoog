@@ -1,21 +1,20 @@
 import { readdir, stat } from "fs/promises";
 import { join } from "path";
 import { pathToFileURL } from "url";
-import type { PluginRoute } from "../../types";
+import type { PluginRoute } from "../../types/extension";
 import { logger } from "../../utils/logger";
 import { pluginsDir } from "../../utils/paths";
-import { bootCircuitFromPath } from "../../utils/translation-circuit";
-import { getPluginRegistryReloadGeneration } from "../registry-factory";
+import { normalizePath } from "../../utils/net/route-path";
+import { bootCircuitFromPath } from "../../utils/extension-support/translation-circuit";
+import { INDEX_FILES, getPluginRegistryReloadGeneration } from "../registry-factory";
 
 interface RouteEntry {
   pluginId: string;
   routes: PluginRoute[];
 }
 
-const _entries: RouteEntry[] = [];
-const _registeredFolders = new Set<string>();
+let _entries: RouteEntry[] = [];
 
-const INDEX_FILES = ["index.js", "index.ts", "index.mjs", "index.cjs"];
 
 function isPluginRoute(val: unknown): val is PluginRoute {
   if (typeof val !== "object" || val === null) return false;
@@ -27,11 +26,6 @@ function isPluginRoute(val: unknown): val is PluginRoute {
     typeof r.handler === "function"
   );
 }
-
-const normalizePath = (p: string): string => {
-  const s = p.trim().replace(/^\/+/, "").replace(/\/+$/, "") || "";
-  return s ? `/${s}` : "/";
-};
 
 const extractRoutes = (mod: Record<string, unknown>): PluginRoute[] => {
   const routes =
@@ -64,8 +58,26 @@ async function resolvePluginEntry(
 }
 
 export const clearPluginRoutes = (): void => {
-  _entries.length = 0;
-  _registeredFolders.clear();
+  _entries = [];
+};
+
+const _routeEntry = async (
+  folderName: string,
+  entryPath: string,
+  mod: Record<string, unknown>,
+): Promise<RouteEntry | null> => {
+  const routes = extractRoutes(mod);
+  if (routes.length === 0) return null;
+  const t = await bootCircuitFromPath(entryPath);
+  for (const route of routes) {
+    route.t = t;
+  }
+  return { pluginId: folderName, routes };
+};
+
+const _addEntry = (into: RouteEntry[], entry: RouteEntry | null): void => {
+  if (!entry || into.some((e) => e.pluginId === entry.pluginId)) return;
+  into.push(entry);
 };
 
 export const registerPluginRoutesFromModule = async (
@@ -73,15 +85,8 @@ export const registerPluginRoutesFromModule = async (
   entryPath: string,
   mod: Record<string, unknown>,
 ): Promise<void> => {
-  if (_registeredFolders.has(folderName)) return;
-  const routes = extractRoutes(mod);
-  if (routes.length === 0) return;
-  const t = await bootCircuitFromPath(entryPath);
-  for (const route of routes) {
-    route.t = t;
-  }
-  _registeredFolders.add(folderName);
-  _entries.push({ pluginId: folderName, routes });
+  if (_entries.some((e) => e.pluginId === folderName)) return;
+  _addEntry(_entries, await _routeEntry(folderName, entryPath, mod));
 };
 
 export async function initPluginRoutes(bust = false): Promise<void> {
@@ -93,6 +98,7 @@ export async function initPluginRoutes(bust = false): Promise<void> {
     logger.debug("plugin-routes", `plugins dir read failed ${dir}`, err);
     return;
   }
+  const next: RouteEntry[] = [];
   for (const entryName of entries) {
     const resolved = await resolvePluginEntry(dir, entryName);
     if (!resolved) continue;
@@ -102,26 +108,18 @@ export async function initPluginRoutes(bust = false): Promise<void> {
         ? `${href}?r=${getPluginRegistryReloadGeneration()}`
         : href;
       const mod = (await import(url)) as Record<string, unknown>;
-      await registerPluginRoutesFromModule(
-        resolved.base,
-        join(dir, resolved.base),
-        mod,
-      );
+      _addEntry(next, await _routeEntry(resolved.base, join(dir, resolved.base), mod));
     } catch (err) {
       logger.debug("plugin-routes", `Failed to import: ${entryName}`, err);
     }
   }
+  _entries = next;
 }
 
 export function resolvePluginFolderId(requestedId: string): string {
   if (_entries.some((e) => e.pluginId === requestedId)) return requestedId;
   const legacy = _entries.find((e) => e.pluginId.endsWith(`-${requestedId}`));
   return legacy?.pluginId ?? requestedId;
-}
-
-export function getPluginRoutes(pluginId: string): PluginRoute[] {
-  const resolved = resolvePluginFolderId(pluginId);
-  return [...(_entries.find((e) => e.pluginId === resolved)?.routes ?? [])];
 }
 
 export function findPluginRoute(

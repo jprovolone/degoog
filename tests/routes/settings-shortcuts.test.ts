@@ -8,12 +8,12 @@ mkdirSync(SHARED, { recursive: true });
 process.env.DEGOOG_SERVER_SETTINGS_FILE = join(SHARED, "server-settings.json");
 process.env.DEGOOG_PLUGIN_SETTINGS_FILE = join(SHARED, "plugin-settings.json");
 
-import router from "../../src/server/routes/settings";
+import router from "../../src/server/routes/settings/settings";
 import {
   clearServerSettingsCache,
   setInstanceSettings,
-} from "../../src/server/utils/server-settings";
-import { clearShortcutsSettingsCache } from "../../src/server/utils/shortcuts-settings";
+} from "../../src/server/utils/settings/server-settings";
+import { clearShortcutsSettingsCache } from "../../src/server/utils/settings/shortcuts-settings";
 
 let savedDangerouslyNoPassword: string | undefined;
 
@@ -74,11 +74,21 @@ describe("settings shortcut routes", () => {
     expect(Array.isArray(data.custom)).toBe(true);
   });
 
-  test("POST rejects invalid shortcut maps", async () => {
-    const unknown = await post("/api/settings/shortcuts", {
-      shortcuts: { unknown: { key: "x" } },
+  test("POST skips bindings for shortcuts that are no longer installed", async () => {
+    const save = await post("/api/settings/shortcuts", {
+      shortcuts: {
+        "uninstalled-shortcut": { key: "x" },
+        "focus-search": { key: "j" },
+      },
     });
-    expect(unknown.status).toBe(400);
+    expect(save.status).toBe(200);
+
+    const data = await (await get("/api/settings/shortcuts")).json();
+    expect(data.shortcuts["focus-search"]).toEqual({ key: "j" });
+    expect(data.shortcuts["uninstalled-shortcut"]).toBeUndefined();
+  });
+
+  test("POST rejects invalid shortcut maps", async () => {
 
     const badShape = await post("/api/settings/shortcuts", {
       shortcuts: { "focus-search": { key: 3 } },

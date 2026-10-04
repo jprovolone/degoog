@@ -5,6 +5,8 @@ export type ServerSettingsData = {
   proxyUrls?: string;
   imageProxyAllowLocal?: BoolSetting;
   imageProxyAllowList?: string;
+  blockClientLeaks?: BoolSetting;
+  privacyPolicy?: string;
   rateLimitEnabled?: BoolSetting;
   rateLimitBurstWindow?: string;
   rateLimitBurstMax?: string;
@@ -15,6 +17,7 @@ export type ServerSettingsData = {
   rateLimitSuggestBurstMax?: string;
   rateLimitSuggestLongWindow?: string;
   rateLimitSuggestLongMax?: string;
+  requestBodyMaxKb?: string;
   acDebounceMs?: string;
   languagesEnabled?: BoolSetting;
   languages?: string;
@@ -38,9 +41,13 @@ export type ServerSettingsData = {
   honeypotEnabled?: BoolSetting;
   honeypotCssCheck?: BoolSetting;
   honeypotBanDuration?: string;
+  nojsEnabled?: BoolSetting;
+  nojsCssCheck?: BoolSetting;
   degoogIndexerEnabled?: BoolSetting;
   searxCompatEnabled?: BoolSetting;
   searxApiEnabled?: BoolSetting;
+  fourgetCompatEnabled?: BoolSetting;
+  engineOriginDisplay?: string;
 };
 
 export type ButtonStateHandler = (

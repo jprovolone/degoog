@@ -1,6 +1,8 @@
-import type { ExtensionMeta, SettingField } from "../types";
-import { maskSecrets, type SettingValue } from "../utils/plugin-settings";
-import { extensionReadmeExists } from "../utils/extension-docs";
+import type { ExtensionMeta, Translate } from "../types/extension";
+import type { SettingField } from "../../shared/setting-field";
+import { maskSecrets, type SettingValue } from "../utils/settings/plugin-settings";
+import { extensionReadmeExists } from "../utils/extension-support/extension-docs";
+import { proxyMarkdownImages } from "../utils/net/proxy-sign";
 
 interface BuildMetaInput {
   id: string;
@@ -22,7 +24,7 @@ export const buildExtensionMeta = async (
   const meta: ExtensionMeta = {
     id,
     displayName: input.displayName,
-    description: input.description,
+    description: input.description ? proxyMarkdownImages(input.description) : input.description,
     type: input.type,
     configurable: schema.length > 0,
     settingsSchema: schema,
@@ -35,3 +37,34 @@ export const buildExtensionMeta = async (
   }
   return meta;
 };
+
+export const translateSchema = (
+  id: string,
+  schema: SettingField[],
+  t: Translate | undefined,
+): SettingField[] =>
+  t
+    ? schema.map((field) => {
+        const base = `${id}.settings.${field.key}`;
+        const label = t(`${base}.label`);
+        const desc =
+          field.description !== undefined
+            ? t(`${base}.description`)
+            : undefined;
+        const placeholder =
+          field.placeholder !== undefined
+            ? t(`${base}.placeholder`)
+            : undefined;
+        return {
+          ...field,
+          label: label !== `${base}.label` ? label : field.label,
+          ...(desc !== undefined && desc !== `${base}.description`
+            ? { description: desc }
+            : {}),
+          ...(placeholder !== undefined &&
+          placeholder !== `${base}.placeholder`
+            ? { placeholder }
+            : {}),
+        };
+      })
+    : schema;

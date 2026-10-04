@@ -1,14 +1,16 @@
 import type { RepoInfo } from "../../types/store-tab";
-import { jsonHeaders } from "../../utils/request";
+import { jsonHeaders } from "../../utils/net/request";
 import { confirmModal } from "../../modules/modals/confirm-modal/confirm";
-import { getBase } from "../../utils/base-url";
+import { getBase } from "../../utils/net/base-url";
 import {
   setItemPhase,
   setRepoPhase,
   streamRefreshAll,
   streamUpdateAll,
-} from "./progress";
-import { maybeShowRestartNotice } from "./restart-notice";
+} from "./overlays/progress";
+import { maybeShowRestartNotice } from "./overlays/restart-notice";
+
+const t = window.scopedT("core");
 
 export function showError(el: HTMLElement | null, msg: string): void {
   if (!el) return;
@@ -36,13 +38,16 @@ export async function handleAddRepo(
     });
     const data = (await res.json()) as { error?: string };
     if (!res.ok) {
-      showError(errorEl, data.error || "Failed to add repository");
+      showError(
+        errorEl,
+        data.error || t("settings-page.store.failed-add-repo"),
+      );
       return;
     }
     if (inputEl) inputEl.value = "";
     await refreshAndRender();
   } catch {
-    showError(errorEl, "Network error");
+    showError(errorEl, t("settings-page.store.network-error"));
   } finally {
     addBtn.disabled = false;
   }
@@ -71,7 +76,13 @@ export async function handleRefresh(
     await refreshAndRender();
     void loadReposStatus().then(() => render());
   } catch {
-    setRepoPhase(container, url, "Refreshing", "failed", "Network error");
+    setRepoPhase(
+      container,
+      url,
+      "Refreshing",
+      "failed",
+      t("settings-page.store.network-error"),
+    );
   }
 }
 
@@ -90,7 +101,7 @@ export async function handleRemove(
   });
   const data = (await res.json()) as { error?: string };
   if (!res.ok) {
-    alert(data.error || "Failed to remove repository");
+    alert(data.error || t("settings-page.store.failed-remove-repo"));
     return;
   }
   await refreshAndRender();
@@ -108,9 +119,8 @@ export async function handleInstall(
   if (
     type === "plugin" &&
     !(await confirmModal({
-      title: "Install plugin?",
-      message:
-        "This plugin will run code on your server. Only install from sources you trust. Continue?",
+      title: t("settings-page.store.install-plugin-title"),
+      message: t("settings-page.store.install-plugin-message"),
     }))
   )
     return;
@@ -133,7 +143,13 @@ export async function handleInstall(
     render();
     window.dispatchEvent(new CustomEvent("extensions-saved"));
   } catch {
-    setItemPhase(container, key, "Installing", "failed", "Network error");
+    setItemPhase(
+      container,
+      key,
+      "Installing",
+      "failed",
+      t("settings-page.store.network-error"),
+    );
   } finally {
     btn.disabled = false;
   }
@@ -148,8 +164,10 @@ export async function handleUninstall(
   const { repoUrl, itemPath, type } = btn.dataset;
   if (
     !(await confirmModal({
-      title: "Uninstall?",
-      message: `Uninstall this ${type ?? "item"}?`,
+      title: t("settings-page.store.uninstall-title"),
+      message: t("settings-page.store.uninstall-message", {
+        type: type ?? "item",
+      }),
     }))
   )
     return;
@@ -161,14 +179,14 @@ export async function handleUninstall(
       body: JSON.stringify({ repoUrl, itemPath, type }),
     });
     const data = (await res.json()) as { error?: string };
-    if (!res.ok) alert(data.error || "Uninstall failed");
+    if (!res.ok) alert(data.error || t("settings-page.store.uninstall-failed"));
     else {
       await loadItems();
       render();
       window.dispatchEvent(new CustomEvent("extensions-saved"));
     }
   } catch {
-    alert("Network error");
+    alert(t("settings-page.store.network-error"));
   } finally {
     btn.disabled = false;
   }
@@ -203,7 +221,7 @@ export async function handleDeleteUntracked(
       window.dispatchEvent(new CustomEvent("extensions-saved"));
     }
   } catch {
-    alert("Network error");
+    alert(t("settings-page.store.network-error"));
   } finally {
     btn.disabled = false;
   }
@@ -238,7 +256,13 @@ export async function handleUpdate(
     window.dispatchEvent(new CustomEvent("extensions-saved"));
     void maybeShowRestartNotice(getToken);
   } catch {
-    setItemPhase(container, key, "Updating", "failed", "Network error");
+    setItemPhase(
+      container,
+      key,
+      "Updating",
+      "failed",
+      t("settings-page.store.network-error"),
+    );
   } finally {
     btn.disabled = false;
   }
@@ -255,9 +279,12 @@ export async function handleUpdateAll(
   );
   if (btn) btn.disabled = true;
   try {
-    const result = await streamUpdateAll(container);
-    if (!result) return;
-    await loadItems();
+    await streamUpdateAll(container);
+    try {
+      await loadItems();
+    } catch (err) {
+      console.warn("[store] reload after update all failed", err);
+    }
     render();
     window.dispatchEvent(new CustomEvent("extensions-saved"));
     void maybeShowRestartNotice(getToken);
@@ -277,9 +304,13 @@ export async function handleRefreshAll(
   );
   if (btn) btn.disabled = true;
   try {
-    const result = await streamRefreshAll(container);
-    if (!result) return;
-    await refreshAndRender();
+    await streamRefreshAll(container);
+    try {
+      await refreshAndRender();
+    } catch (err) {
+      console.warn("[store] reload after refresh all failed", err);
+      render();
+    }
     void loadReposStatus().then(() => render());
   } finally {
     if (btn) btn.disabled = false;
@@ -288,9 +319,8 @@ export async function handleRefreshAll(
 
 export async function confirmRemoveRepo(_url: string): Promise<boolean> {
   const ok = await confirmModal({
-    title: "Remove repository?",
-    message:
-      "Remove this repository? You must uninstall any installed items first.",
+    title: t("settings-page.store.remove-repo-title"),
+    message: t("settings-page.store.remove-repo-message"),
   });
   return ok;
 }

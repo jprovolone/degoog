@@ -9,18 +9,26 @@ export const createFieldSaveBtn = (): HTMLButtonElement => {
   return btn;
 };
 
+const _revisions = new WeakMap<HTMLButtonElement, number>();
+
+export const markFieldDirty = (btn: HTMLButtonElement): void => {
+  _revisions.set(btn, (_revisions.get(btn) ?? 0) + 1);
+  btn.hidden = false;
+};
+
 export const bindFieldSaveBtn = (
   btn: HTMLButtonElement,
   save: () => Promise<boolean>,
 ): void => {
   btn.addEventListener("click", async () => {
     const prev = btn.textContent ?? "";
+    const revision = _revisions.get(btn) ?? 0;
     btn.disabled = true;
     const ok = await save();
     if (ok) {
       btn.textContent = t("settings-page.server.saved");
       setTimeout(() => {
-        btn.hidden = true;
+        if ((_revisions.get(btn) ?? 0) === revision) btn.hidden = true;
         btn.textContent = prev;
         btn.disabled = false;
       }, 1200);

@@ -1,10 +1,10 @@
 import { state } from "../../state";
-import { getBase } from "../../utils/base-url";
-import { performSearch } from "../../utils/search-actions";
-import { getEnabledSearchTypes } from "../../utils/engines";
-import { getBangMatchType } from "../../utils/navigation";
+import { getBase } from "../../utils/net/base-url";
+import { performSearch } from "../../utils/search/actions/search-actions-perform";
+import { getEnabledSearchTypes } from "../../utils/search/engines";
+import { isBangTabVisible } from "../../utils/navigation/navigation";
 import { performTabSearch } from "./tab-search";
-import { getTabOrder, applyTabOrder } from "../../utils/tab-order";
+import { getTabOrder, applyTabOrder } from "../../utils/settings/tab-order";
 import { TAB_ORDER_SAVED } from "../../constants";
 
 interface TabInfo {
@@ -108,8 +108,6 @@ function _renderPluginTabs(): void {
     .querySelectorAll(".results-tab[data-plugin-tab]")
     .forEach((el) => el.remove());
 
-  const bangMatchType = getBangMatchType();
-
   for (const tab of pluginTabs) {
     const el = document.createElement("div");
     el.className = "results-tab degoog-tab";
@@ -117,27 +115,22 @@ function _renderPluginTabs(): void {
     el.dataset.pluginTab = "true";
     el.textContent = tab.name;
 
-    if (bangMatchType !== undefined) {
-      const tabType = el.dataset.type ?? "";
-      const visible =
-        bangMatchType !== null &&
-        (tabType === bangMatchType || tabType === `tab:engine:${bangMatchType}`);
-      el.dataset.bangHidden = visible ? "" : "true";
-      if (!visible) el.style.display = "none";
+    const bangVisible = isBangTabVisible(el.dataset.type);
+    if (bangVisible !== undefined) {
+      el.dataset.bangHidden = bangVisible ? "" : "true";
+      if (!bangVisible) el.style.display = "none";
     }
 
     tabsContainer.insertBefore(el, toolsWrap);
 
     el.addEventListener("click", () => {
-      if (state.currentQuery) {
+      if (state.currentBangQuery) {
+        void performSearch(state.currentBangQuery, `tab:${tab.id}`);
+      } else if (state.currentQuery) {
         void performTabSearch(state.currentQuery, tab.id);
       }
     });
   }
-}
-
-export function reloadPluginTabs(): void {
-  void _loadPluginTabs();
 }
 
 export const getPluginTabIds = async (): Promise<Set<string>> => {

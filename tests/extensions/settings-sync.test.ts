@@ -2,11 +2,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "b
 import {
   INVALIDATE_SCOPE,
   type InvalidatePayload,
-} from "../../src/server/utils/cache-valkey";
-import type { SettingValue } from "../../src/server/utils/plugin-settings";
+} from "../../src/server/utils/cache/cache-valkey";
+import type { SettingValue } from "../../src/server/utils/settings/plugin-settings";
 
 const RESOLVE_MOD = "../../src/server/extensions/resolve";
-const SETTINGS_MOD = "../../src/server/utils/plugin-settings";
+const SETTINGS_MOD = "../../src/server/utils/settings/plugin-settings";
 
 const resolveReal = { ...(await import(RESOLVE_MOD)) };
 const settingsReal = { ...(await import(SETTINGS_MOD)) };
@@ -15,6 +15,7 @@ type ExtSettings = Record<string, SettingValue>;
 
 interface FakeTarget {
   priority?: number;
+  settingsSchema?: { key: string; type: string; label: string; default?: string }[];
   configured: ExtSettings[];
   configure: (settings: ExtSettings) => void;
 }
@@ -67,6 +68,7 @@ beforeAll(async () => {
             }
           : null,
       autocomplete: null,
+      favicon: null,
     }),
   }));
   mock.module(SETTINGS_MOD, () => ({
@@ -97,6 +99,18 @@ describe("extensions/settings-sync", () => {
 
     expect(slot.configured).toEqual([{ city: "Rome", priority: "7" }]);
     expect(slot.priority).toBe(7);
+  });
+
+  test("a partial update is configured with the schema defaults merged in", async () => {
+    slot.settingsSchema = [
+      { key: "city", type: "text", label: "City", default: "Paris" },
+      { key: "units", type: "text", label: "Units", default: "metric" },
+    ];
+
+    await sync.syncExtSettings("weather-slot", { city: "Rome" });
+    await settle();
+
+    expect(slot.configured).toEqual([{ city: "Rome", units: "metric" }]);
   });
 
   test("peer workers re-apply the stored settings", async () => {

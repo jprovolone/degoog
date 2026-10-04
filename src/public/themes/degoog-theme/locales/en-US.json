@@ -7,7 +7,8 @@
   "index-templates": {
     "footer": {
       "repo": "repo",
-      "docs": "docs"
+      "docs": "docs",
+      "privacy-policy": "privacy policy"
     },
     "header": {
       "settings-title": "Settings"
@@ -37,6 +38,7 @@
       "any-time": "Any time",
       "language": "Language",
       "any": "Any",
+      "any-language": "Any language",
       "hour": "Hour",
       "day": "24 hours",
       "week": "Week",
@@ -91,6 +93,7 @@
     "no-engines": "No search engines installed. {store} to browse and install some.",
     "no-engines-store": "Go to the Store",
     "sidebar": {
+      "engine-origin": "Provided by {source}",
       "engine-performance": "Engine Performance",
       "people-also-search": "People also search for",
       "info": "Info",
@@ -115,6 +118,7 @@
       "saving-to-index": "Saving to your index",
       "insecure": "Insecure",
       "insecure-tooltip": "This site is served over an unencrypted HTTP connection.",
+      "favicon-missing": "No favicon extension installed",
       "actions": {
         "menu-aria": "Domain actions",
         "block": "Block this domain",
@@ -128,7 +132,10 @@
         "prompt-score": "Score for this domain (positive boosts, negative demotes):",
         "modal-confirm": "Confirm",
         "modal-cancel": "Cancel",
-        "scored": "Scored"
+        "scored": "Scored",
+        "refresh": "Refresh favicon",
+        "refreshed": "Favicon refreshed",
+        "refresh-failed": "No favicon found"
       }
     },
     "pagination": {
@@ -136,6 +143,29 @@
       "next": "Next",
       "page": "Page {page}",
       "end": "No more results."
+    },
+    "status": {
+      "streaming": "About {count} results (streaming...)",
+      "done": "About {count} results ({time} seconds)",
+      "page": "About {count} results - Page {page}",
+      "searching": "Searching...",
+      "running-command": "Running command..."
+    },
+    "media-preview": {
+      "visit": "Visit page",
+      "watch": "Watch video",
+      "download": "Download"
     }
+  },
+  "nojs": {
+    "search-label": "Search query",
+    "pagination-label": "Result pages",
+    "results-meta": "{count} results in {time} ms",
+    "no-results": "No results found.",
+    "rate-limited": "Too many requests. Please wait a moment and try again.",
+    "full-app": "Full version",
+    "command-unsupported": "This extension was not set up to work in the no-JS environment. Please contact the extension developer to ask if integration is possible or planned.",
+    "command-disabled": "This command is turned off on this instance.",
+    "command-failed": "This command could not be completed. Please try again."
   }
 }

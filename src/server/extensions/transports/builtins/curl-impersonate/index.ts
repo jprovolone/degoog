@@ -3,8 +3,8 @@ import type {
   Transport,
   TransportContext,
   TransportFetchOptions,
-} from "../../../../types";
-import type { AsyncTtlCache } from "../../../../utils/cache";
+} from "../../../../types/extension";
+import type { AsyncTtlCache } from "../../../../utils/cache/cache";
 import { logger } from "../../../../utils/logger";
 import {
   appendCurlCookieStdoutDelimiters,
@@ -12,6 +12,7 @@ import {
   parseCurlStdoutWithCookieJar,
   saveCookieJar,
 } from "../../utils/curl-cookie-cache";
+import { killOnAbort } from "../../utils/kill-on-abort";
 
 const STATUS_DELIMITER = randomUUID();
 const COOKIE_DELIMITER = randomUUID();
@@ -53,9 +54,7 @@ function _buildCurlArgs(
   const method = (options.method ?? "GET").toUpperCase();
   const args = [
     "-sS",
-    "-L",
-    "--max-redirs",
-    "5",
+    ...(options.redirect === "manual" ? [] : ["-L", "--max-redirs", "5"]),
     "--max-time",
     "30",
   ];
@@ -90,12 +89,15 @@ async function _run(
   binary: string,
   args: string[],
   cookieJarText: string,
+  signal: AbortSignal | undefined,
 ): Promise<CurlRunResult> {
+  signal?.throwIfAborted();
   const proc = Bun.spawn([binary, ...args], {
     stdin: "pipe",
     stdout: "pipe",
     stderr: "pipe",
   });
+  const release = killOnAbort(proc, signal);
 
   const stdin = proc.stdin;
   if (stdin) {
@@ -112,8 +114,9 @@ async function _run(
     Bun.readableStreamToBytes(proc.stdout),
     new Response(proc.stderr).text(),
     proc.exited,
-  ]);
+  ]).finally(release);
 
+  signal?.throwIfAborted();
   if (exitCode !== 0) {
     throw new Error(stderrText.trim() || `curl-impersonate failed (${exitCode})`);
   }
@@ -128,7 +131,10 @@ async function _run(
   return {
     response: new Response(parsed.bodyText, {
       status: parsed.status,
-      headers: { "Content-Type": "text/html; charset=utf-8" },
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        ...(parsed.location ? { Location: parsed.location } : {}),
+      },
     }),
     cookieJarText: parsed.cookieJarText,
   };
@@ -152,7 +158,9 @@ async function _fetchViaImpersonate(
       {},
       proxyUrl,
     );
-    const warmup = await _run(binary, warmupArgs, jar).catch(() => null);
+    const warmup = await _run(binary, warmupArgs, jar, options.signal).catch(
+      () => null,
+    );
     if (warmup?.cookieJarText) {
       jar = warmup.cookieJarText;
       await saveCookieJar(cookieCache, cookieKey, jar, COOKIE_TTL_MS);
@@ -160,7 +168,7 @@ async function _fetchViaImpersonate(
   }
 
   const args = _buildCurlArgs(url, options, proxyUrl);
-  const result = await _run(binary, args, jar);
+  const result = await _run(binary, args, jar, options.signal);
   await saveCookieJar(cookieCache, cookieKey, result.cookieJarText, COOKIE_TTL_MS);
   return result.response;
 }

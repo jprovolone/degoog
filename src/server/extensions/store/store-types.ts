@@ -1,4 +1,4 @@
-import { ExtensionStoreType } from "../../types";
+import { ExtensionStoreType } from "../../types/extension";
 import {
   pluginsDir,
   themesDir,
@@ -6,24 +6,28 @@ import {
   transportsDir,
   autocompleteDir,
   shortcutsDir,
+  faviconDir,
 } from "../../utils/paths";
-import { getPluginSettingsIds } from "../../utils/plugin-assets";
-import { makeExtID } from "../../utils/extension-id";
+import {
+  getPluginSettingsIds,
+  prunePluginAssets,
+} from "../../utils/extension-support/plugin-assets";
+import { makeExtID } from "../../utils/extension-support/extension-id";
 import { reloadCommands } from "../commands/registry";
 import { reloadSlotPlugins } from "../slots/registry";
 import { reloadInterceptors } from "../interceptors/registry";
 import { reloadSearchResultTabs } from "../search-result-tabs/registry";
 import { reloadSearchBarActions } from "../search-bar/registry";
 import {
-  clearPluginRoutes,
   initPluginRoutes,
 } from "../plugin-routes/registry";
 import { reloadMiddlewareRegistry } from "../middleware/registry";
 import { reloadThemes } from "../themes/registry";
-import { reloadEngines } from "../engines/registry";
-import { reloadTransports } from "../transports/registry";
-import { reloadAutocomplete } from "../autocomplete/registry";
+import { initEngines } from "../engines/loader";
+import { initTransports } from "../transports/registry";
+import { initAutocomplete } from "../autocomplete/registry";
 import { reloadShortcutsRegistry } from "../shortcuts/registry";
+import { initFavicon } from "../favicon/registry";
 
 type ManifestKey =
   | "plugins"
@@ -31,7 +35,8 @@ type ManifestKey =
   | "engines"
   | "transports"
   | "autocomplete"
-  | "shortcuts";
+  | "shortcuts"
+  | "favicon";
 
 interface StoreTypeSpec {
   destDir: () => string;
@@ -41,7 +46,6 @@ interface StoreTypeSpec {
 }
 
 const reloadPluginBundle = async (bust: boolean): Promise<void> => {
-  clearPluginRoutes();
   await reloadSlotPlugins(bust);
   await reloadInterceptors(bust);
   await reloadSearchResultTabs(bust);
@@ -49,6 +53,7 @@ const reloadPluginBundle = async (bust: boolean): Promise<void> => {
   await reloadSearchBarActions(bust);
   await reloadMiddlewareRegistry(bust);
   await initPluginRoutes(bust);
+  prunePluginAssets(pluginsDir());
 };
 
 const pluginSettingsIds = (installedAs: string): string[] => {
@@ -73,19 +78,19 @@ export const STORE_TYPE_SPECS: Record<ExtensionStoreType, StoreTypeSpec> = {
   [ExtensionStoreType.Engine]: {
     destDir: enginesDir,
     manifestKey: "engines",
-    reload: reloadEngines,
+    reload: initEngines,
     settingsIds: (id) => [makeExtID(id, "engine")],
   },
   [ExtensionStoreType.Transport]: {
     destDir: transportsDir,
     manifestKey: "transports",
-    reload: reloadTransports,
+    reload: initTransports,
     settingsIds: (id) => [makeExtID(id, "transport")],
   },
   [ExtensionStoreType.Autocomplete]: {
     destDir: autocompleteDir,
     manifestKey: "autocomplete",
-    reload: reloadAutocomplete,
+    reload: initAutocomplete,
     settingsIds: (id) => [makeExtID(id, "autocomplete")],
   },
   [ExtensionStoreType.Shortcut]: {
@@ -93,5 +98,11 @@ export const STORE_TYPE_SPECS: Record<ExtensionStoreType, StoreTypeSpec> = {
     manifestKey: "shortcuts",
     reload: reloadShortcutsRegistry,
     settingsIds: (id) => [makeExtID(id, "shortcut")],
+  },
+  [ExtensionStoreType.Favicon]: {
+    destDir: faviconDir,
+    manifestKey: "favicon",
+    reload: initFavicon,
+    settingsIds: (id) => [makeExtID(id, "favicon")],
   },
 };

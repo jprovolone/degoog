@@ -1,8 +1,9 @@
-import { mkdir, readdir, rename, unlink, writeFile } from "fs/promises";
+import { mkdir, readdir, unlink } from "fs/promises";
 import { existsSync } from "fs";
-import { randomBytes } from "crypto";
 import { join, resolve } from "path";
 import { logger } from "../../../utils/logger";
+import { createMutex } from "../../../utils/cache/mutex";
+import { writeFileAtomic } from "../../../utils/storage/atomic-json";
 import {
   SEARX_CATALOG,
   SEARX_SOURCE_BASE_URL,
@@ -23,13 +24,7 @@ const DOWNLOAD_TIMEOUT_MS = 20_000;
 const TRAITS_SUFFIX = ".traits.json";
 const SHORTEST_ALIAS = 4;
 
-let _queue: Promise<unknown> = Promise.resolve();
-
-export const withSearxLock = <T>(task: () => Promise<T>): Promise<T> => {
-  const run = _queue.then(task, task);
-  _queue = run.catch(() => undefined);
-  return run;
-};
+export const withSearxLock = createMutex();
 
 const _enginePath = (code: string): string => join(resolve(searxEnginesDir()), `${code}.py`);
 
@@ -64,22 +59,10 @@ const _download = async (code: string): Promise<string> => {
 const _missingDeps = (code: string): string[] =>
   catalogDeps(code).filter((dep) => !_isInstalled(dep));
 
-const _writeSwap = async (target: string, body: string): Promise<void> => {
-  const tmp = `${target}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;
-  try {
-    await mkdir(resolve(searxEnginesDir()), { recursive: true });
-    await writeFile(tmp, body, "utf-8");
-    await rename(tmp, target);
-  } catch (err) {
-    await unlink(tmp).catch(() => undefined);
-    throw err;
-  }
-};
-
 const _fetchFile = async (code: string, dir: string): Promise<void> => {
   const source = await _download(code);
   await mkdir(dir, { recursive: true });
-  await _writeSwap(_enginePath(code), source);
+  await writeFileAtomic(_enginePath(code), source);
   await _dropCache(code);
 };
 
@@ -115,7 +98,7 @@ const _traitsBook = async (): Promise<Record<string, unknown>> => {
 const _saveTraits = async (code: string, book: Record<string, unknown>): Promise<void> => {
   const key = _traitsKey(Object.keys(book), code);
   const entry = key ? book[key] : undefined;
-  await _writeSwap(_traitsPath(code), JSON.stringify(entry ?? {}));
+  await writeFileAtomic(_traitsPath(code), JSON.stringify(entry ?? {}));
 };
 
 const _pullTraits = async (codes: readonly string[]): Promise<void> => {

@@ -1,4 +1,4 @@
-import type { AppState } from "./types";
+import type { AppState } from "./types/state";
 import type { ImageFilter } from "./types/search";
 
 export const defaultImageFilter = (): ImageFilter => ({});
@@ -29,6 +29,18 @@ export const state: AppState = {
   inlineGifPlayback: true,
   stickySidebar: false,
   hideUrlParams: false,
+  showResultDates: true,
   isInitialLoad: false,
   imageFilter: defaultImageFilter(),
+  searchSeq: 0,
+};
+
+export const beginSearch = (): number => ++state.searchSeq;
+
+export const isCurrentSearch = (seq: number): boolean => seq === state.searchSeq;
+
+export const takeRestoreInfinitePage = (): number => {
+  const page = state.restoreInfinitePage;
+  state.restoreInfinitePage = 1;
+  return page;
 };

@@ -207,6 +207,12 @@
   border-radius: $radius-xs;
 }
 
+.media-preview-favicon-wrap .degoog-result--favicon-missing {
+  width: 100%;
+  height: 100%;
+  font-size: 0.5625rem;
+}
+
 .media-preview-domain {
   font-size: $font-size-small;
   color: var(--text-secondary);

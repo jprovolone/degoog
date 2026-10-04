@@ -1,10 +1,12 @@
 import { existsSync, readFileSync } from "fs";
 import type { Subprocess, Server } from "bun";
 import { logger } from "./logger";
-import { closeAllDbs } from "../indexer/db";
-import { stopQueue } from "../indexer/queue";
-import { clearRestartPending } from "./restart-state";
-import { envTruthy } from "../routes/settings-auth";
+import { closeAllDbs } from "../indexer/db/lifecycle";
+import { closeFaviconStore } from "../indexer/store/favicons";
+import { stopQueue } from "../indexer/queue/queue";
+import { clearRestartPending } from "./extension-support/restart-state";
+import { flushHosts } from "../extensions/engines/engine-hosts";
+import { envTruthy } from "../routes/settings/settings-auth";
 
 const RESTART_EXIT_DELAY_MS = 250;
 
@@ -17,7 +19,7 @@ export const registerServerHandle = (server: Server<unknown>): void => {
 export const isDockerRuntime = (): boolean =>
   envTruthy("DEGOOG_DOCKER") || existsSync("/.dockerenv");
 
-export const isLXCRuntime = (): boolean => {
+const isLXCRuntime = (): boolean => {
   try {
     return readFileSync("/run/systemd/container", "utf8").trim() === "lxc";
   } catch {
@@ -62,6 +64,13 @@ const becomeSignalForwarder = (child: Subprocess): void => {
   child.exited.then((code) => process.exit(code ?? 0));
 };
 
+export const drainServer = async (): Promise<void> => {
+  await stopQueue().catch((err: unknown) =>
+    logger.error("server", "indexer queue did not drain", err),
+  );
+  await Promise.allSettled([closeAllDbs(), closeFaviconStore(), flushHosts()]);
+};
+
 export const requestRestart = (reason: string): void => {
   logger.info("server", `restart requested: ${reason}`);
   clearRestartPending();
@@ -69,14 +78,12 @@ export const requestRestart = (reason: string): void => {
     _serverHandle?.stop(true);
     const exitCode = isLXCRuntime() ? 1 : 0;
     const child = spawnReplacementProcess();
-    stopQueue()
-      .finally(async () => {
-        await closeAllDbs();
-        if (child && hasControllingTerminal()) {
-          becomeSignalForwarder(child);
-        } else {
-          process.exit(exitCode);
-        }
-      });
+    void drainServer().then(() => {
+      if (child && hasControllingTerminal()) {
+        becomeSignalForwarder(child);
+      } else {
+        process.exit(exitCode);
+      }
+    });
   }, RESTART_EXIT_DELAY_MS);
 };

@@ -1,14 +1,21 @@
-import { saveField, saveBatch } from "../../utils/settings-api";
-import { bindFieldSaveBtn, createFieldSaveBtn } from "../shared/field-save";
+import { saveField, saveBatch } from "../../utils/settings/settings-api";
+import {
+  bindFieldSaveBtn,
+  createFieldSaveBtn,
+  markFieldDirty,
+} from "../shared/field-save";
 import { flashError, flashSuccess } from "../shared/flash-msg";
 import { setIndexerNavVisible } from "../indexer/nav";
 import { OVERSIZED_CLASS } from "../shared/oversized";
 import { boolStr, el } from "./fields";
 import { serializeScoreRows } from "./domain-score";
 
+const COMPAT_TOGGLES = ["searx-compat-enabled", "fourget-compat-enabled"];
+
 const TOGGLE_KEYS = [
   "proxy-enabled",
   "image-proxy-allow-local",
+  "block-client-leaks",
   "languages-enabled",
   "rate-limit-enabled",
   "rate-limit-suggest-enabled",
@@ -25,10 +32,15 @@ const TOGGLE_KEYS = [
   "api-key-suggest-enabled",
   "honeypot-enabled",
   "honeypot-css-check",
+  "nojs-enabled",
+  "nojs-css-check",
   "degoog-indexer-enabled",
   "searx-compat-enabled",
   "searx-api-enabled",
+  "fourget-compat-enabled",
 ] as const;
+
+const SELECT_IDS = ["engine-origin-display"] as const;
 
 const RL_SEARCH_KEYS = [
   "rateLimitBurstWindow",
@@ -70,7 +82,7 @@ export const bindToggleAutoSave = (getToken: () => string | null): void => {
         }
         flashSuccess(window.scopedT("core")("settings-page.server.saved"));
         _syncVisibilityToggle(id, input.checked);
-        if (id === "degoog-indexer-enabled" || id === "searx-compat-enabled") {
+        if (COMPAT_TOGGLES.includes(id) || id === "degoog-indexer-enabled") {
           window.dispatchEvent(new Event("extensions-saved"));
         }
       } catch (err) {
@@ -78,6 +90,36 @@ export const bindToggleAutoSave = (getToken: () => string | null): void => {
         input.checked = !prev;
         _syncVisibilityToggle(id, input.checked);
         flashError(window.scopedT("core")("settings-page.server.save-failed-network"));
+      }
+    });
+  }
+};
+
+export const bindSelectAutoSave = (getToken: () => string | null): void => {
+  for (const id of SELECT_IDS) {
+    const select = document.getElementById(`settings-${id}`) as HTMLSelectElement | null;
+    if (!select) continue;
+    const key = _toCamel(id);
+    let previous = select.value;
+    select.addEventListener("change", async () => {
+      const chosen = select.value;
+      select.disabled = true;
+      try {
+        const ok = await saveField(key, chosen, getToken);
+        if (!ok) {
+          console.error("[auto-save] select save failed", { key });
+          select.value = previous;
+          flashError(window.scopedT("core")("settings-page.server.save-failed-network"));
+          return;
+        }
+        previous = chosen;
+        flashSuccess(window.scopedT("core")("settings-page.server.saved"));
+      } catch (err) {
+        console.error("[auto-save] select save error", { key, err });
+        select.value = previous;
+        flashError(window.scopedT("core")("settings-page.server.save-failed-network"));
+      } finally {
+        select.disabled = false;
       }
     });
   }
@@ -103,7 +145,7 @@ export const injectFieldSaveBtns = (getToken: () => string | null): void => {
     if (field.classList.contains(OVERSIZED_CLASS)) continue;
     const btn = createFieldSaveBtn();
     field.insertAdjacentElement("afterend", btn);
-    field.addEventListener("input", () => { btn.hidden = false; });
+    field.addEventListener("input", () => markFieldDirty(btn));
     if (field instanceof HTMLInputElement && field.type === "number") {
       field.addEventListener("keydown", (e) => {
         if (e.key === "Enter") { e.preventDefault(); btn.click(); }
@@ -117,7 +159,7 @@ export const injectFieldSaveBtns = (getToken: () => string | null): void => {
     const btn = createFieldSaveBtn();
     rlSearchGroup.appendChild(btn);
     rlSearchGroup.querySelectorAll<HTMLInputElement>('input[type="number"]').forEach((input) => {
-      input.addEventListener("input", () => { btn.hidden = false; });
+      input.addEventListener("input", () => markFieldDirty(btn));
       input.addEventListener("keydown", (e) => {
         if (e.key === "Enter") { e.preventDefault(); btn.click(); }
       });
@@ -130,7 +172,7 @@ export const injectFieldSaveBtns = (getToken: () => string | null): void => {
     const btn = createFieldSaveBtn();
     rlSuggestGroup.appendChild(btn);
     rlSuggestGroup.querySelectorAll<HTMLInputElement>('input[type="number"]').forEach((input) => {
-      input.addEventListener("input", () => { btn.hidden = false; });
+      input.addEventListener("input", () => markFieldDirty(btn));
       input.addEventListener("keydown", (e) => {
         if (e.key === "Enter") { e.preventDefault(); btn.click(); }
       });
@@ -142,7 +184,7 @@ export const injectFieldSaveBtns = (getToken: () => string | null): void => {
   if (scoreSection) {
     const btn = createFieldSaveBtn();
     scoreSection.insertAdjacentElement("afterend", btn);
-    const markDirty = (): void => { btn.hidden = false; };
+    const markDirty = (): void => markFieldDirty(btn);
     new MutationObserver(markDirty).observe(scoreSection, { childList: true, subtree: true });
     document.getElementById("settings-domain-score-add")?.addEventListener("click", markDirty);
     bindFieldSaveBtn(btn, () => saveField("domainScoreList", serializeScoreRows(), getToken));

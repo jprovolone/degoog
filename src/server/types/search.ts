@@ -1,14 +1,5 @@
 import type { EnginePagination } from "../../shared/search-types";
 
-export type {
-  SearchResult,
-  ScoredResult,
-  EngineTiming,
-  SlotPanel,
-  SearchResponse,
-  EnginePagination,
-} from "../../shared/search-types";
-export { SlotPanelPosition } from "../../shared/search-types";
 
 export enum ImgColor {
   ANY = "any",
@@ -67,9 +58,12 @@ export interface ImageFilter {
   nsfw?: ImgNsfw;
 }
 
+export type DefaultEngines = Record<string, boolean | Record<string, boolean>>;
+
 export interface SearchBody {
   query: string;
   engines: string[];
+  bangs?: string[];
   type?: string;
   page?: number;
   time?: string;
@@ -118,7 +112,7 @@ export type TimeFilter =
   | "custom";
 export type EngineConfig = Record<string, boolean>;
 
-export type EngineFetch = (
+type EngineFetch = (
   url: string,
   options?: {
     headers?: Record<string, string>;

@@ -7,11 +7,11 @@
 import { readdir, stat } from "fs/promises";
 import { dirname, join } from "path";
 import { pathToFileURL } from "url";
-import { registerDocsDir } from "../utils/extension-docs";
+import { registerDocsDir } from "../utils/extension-support/extension-docs";
 import { logger } from "../utils/logger";
-import { refreshModules } from "../utils/module-cache";
-import { createMutex } from "../utils/mutex";
-import { makeExtID, dedupeExtID, type ExtensionKind } from "../utils/extension-id";
+import { refreshModules } from "../utils/cache/module-cache";
+import { createMutex } from "../utils/cache/mutex";
+import { makeExtID, dedupeExtID, type ExtensionKind } from "../utils/extension-support/extension-id";
 export type RegistrySource = "plugin" | "builtin";
 
 let _pluginReloadGeneration = 0;
@@ -28,7 +28,7 @@ export const getPluginRegistryReloadGeneration = (): number =>
  * { dir: pluginsDir() }
  * { dir: builtinsDir, source: "builtin" }
  */
-export interface RegistryDir {
+interface RegistryDir {
   dir: string;
   source?: RegistrySource;
 }
@@ -36,7 +36,7 @@ export interface RegistryDir {
 /**
  * Metadata passed to `onLoad` after an extension is successfully extracted and validated.
  */
-export interface RegistryLoadMeta {
+interface RegistryLoadMeta {
   /** Absolute path to the extension's folder (or file for flat-file extensions). */
   entryPath: string;
   /** Folder or base filename, used as the extension's natural ID. */
@@ -80,7 +80,7 @@ export interface RegistryLoadMeta {
  *   debugTag: "slots",
  * });
  */
-export interface RegistryOptions<T> {
+interface RegistryOptions<T> {
   /**
    * One or more directories to scan. Can be a static array or a function
    * evaluated on each `init()` call (use a function when the path depends
@@ -109,6 +109,7 @@ export interface RegistryOptions<T> {
    * "init failed", which is logged and also skips the item.
    */
   onLoad?(item: T, meta: RegistryLoadMeta): Promise<void | false>;
+  reset?(): void;
   canonicalIdKind?: ExtensionKind;
   /**
    * When `true`, plain `.js/.ts/.mjs/.cjs` files in the directory are
@@ -120,7 +121,7 @@ export interface RegistryOptions<T> {
   debugTag: string;
 }
 
-const INDEX_FILES = ["index.js", "index.ts", "index.mjs", "index.cjs"];
+export const INDEX_FILES = ["index.js", "index.ts", "index.mjs", "index.cjs"];
 const FLAT_FILE_EXT = /\.(js|ts|mjs|cjs)$/;
 
 async function resolveEntryPath(
@@ -199,10 +200,14 @@ export function createRegistry<T>(opts: RegistryOptions<T>): {
   refresh: () => Promise<void>;
 } {
   let _items: T[] = [];
-  const _canonicalIds = new Set<string>();
   const _loadMutex = createMutex();
 
-  async function loadFromDir(registryDir: RegistryDir, bust: boolean): Promise<void> {
+  async function loadFromDir(
+    registryDir: RegistryDir,
+    bust: boolean,
+    into: T[],
+    canonicalIds: Set<string>,
+  ): Promise<void> {
     let entries: string[];
     try {
       entries = (await readdir(registryDir.dir)).sort((a, b) =>
@@ -256,11 +261,11 @@ export function createRegistry<T>(opts: RegistryOptions<T>): {
       const canonicalId = opts.canonicalIdKind
         ? dedupeExtID(
             makeExtID(c.r.base, opts.canonicalIdKind),
-            _canonicalIds,
+            canonicalIds,
             c.r.fullPath,
           )
         : undefined;
-      if (canonicalId) _canonicalIds.add(canonicalId);
+      if (canonicalId) canonicalIds.add(canonicalId);
       toInit.push({
         extracted: c.extracted,
         meta: {
@@ -276,7 +281,7 @@ export function createRegistry<T>(opts: RegistryOptions<T>): {
     if (!opts.onLoad) {
       for (const { extracted, meta, docsDir } of toInit) {
         _rememberDocs(extracted, meta, docsDir);
-        _items.push(extracted);
+        into.push(extracted);
       }
       return;
     }
@@ -296,7 +301,7 @@ export function createRegistry<T>(opts: RegistryOptions<T>): {
           continue;
         }
         _rememberDocs(toInit[i].extracted, toInit[i].meta, toInit[i].docsDir);
-        _items.push(toInit[i].extracted);
+        into.push(toInit[i].extracted);
       } else {
         logger.debug(
           opts.debugTag,
@@ -308,12 +313,14 @@ export function createRegistry<T>(opts: RegistryOptions<T>): {
   }
 
   async function _load(bust: boolean): Promise<void> {
-    _items = [];
-    _canonicalIds.clear();
+    opts.reset?.();
+    const next: T[] = [];
+    const canonicalIds = new Set<string>();
     const dirs = typeof opts.dirs === "function" ? opts.dirs() : opts.dirs;
     for (const d of dirs) {
-      await loadFromDir(d, bust);
+      await loadFromDir(d, bust, next, canonicalIds);
     }
+    _items = next;
   }
 
   const init = (bust = false): Promise<void> => _loadMutex(() => _load(bust));

@@ -1,40 +1,28 @@
-import { join } from "path";
-import type {
-  BangCommand,
-  ExtensionMeta,
-  SettingField,
-  Translate,
-} from "../../types";
+import { commandBuiltinsDir } from "./builtins-dir";
+import type { BangCommand, ExtensionMeta, Translate } from "../../types/extension";
+import type { SettingField } from "../../../shared/setting-field";
 import {
   initPlugin,
   loadPluginAssets,
   lockinNameSpace,
-} from "../../utils/plugin-assets";
+} from "../../utils/extension-support/plugin-assets";
 import {
   asString,
   getSettings,
   isDisabled,
-} from "../../utils/plugin-settings";
-import { bootCircuitFromPath } from "../../utils/translation-circuit";
-import {
-  getDefaultEngineConfig,
-  getEngineMap as getSearchEngineMap,
-} from "../engines/registry";
+} from "../../utils/settings/plugin-settings";
+import { bootCircuitFromPath } from "../../utils/extension-support/translation-circuit";
+import { getDefaultEngineBangConfig, getEngineMap as getSearchEngineMap } from "../engines/catalog";
 import { pluginsDir } from "../../utils/paths";
 import { createRegistry } from "../registry-factory";
-import { makeExtID, folderFromExtID } from "../../utils/extension-id";
-import { buildExtensionMeta } from "../extension-meta";
+import { isEngineBangAllowed } from "../../search/engine-bang";
+import type { EngineConfig } from "../../types/search";
+import { makeExtID, folderFromExtID } from "../../utils/extension-support/extension-id";
+import { buildExtensionMeta, translateSchema } from "../extension-meta";
 import { logger } from "../../utils/logger";
-import { isExtensionRestartFlagVisible } from "../../utils/restart-state";
-
-const builtinsDir = join(
-  process.cwd(),
-  "src",
-  "server",
-  "extensions",
-  "commands",
-  "builtins",
-);
+import {
+  isExtensionRestartFlagVisible,
+} from "../../utils/extension-support/restart-state";
 
 interface CommandEntry {
   id: string;
@@ -70,7 +58,7 @@ const commandSourceMap = new Map<string, "builtin" | "plugin">();
 const seenTriggers = new Set<string>();
 
 const registry = createRegistry<CommandEntry>({
-  dirs: () => [{ dir: builtinsDir, source: "builtin" }, { dir: pluginsDir() }],
+  dirs: () => [{ dir: commandBuiltinsDir, source: "builtin" }, { dir: pluginsDir() }],
   match: (mod) => {
     const Export = mod.default ?? mod.command ?? mod.Command;
     const instance: BangCommand =
@@ -85,6 +73,7 @@ const registry = createRegistry<CommandEntry>({
       instance,
     };
   },
+  reset: () => seenTriggers.clear(),
   onLoad: async (entry, { entryPath, folderName, source }) => {
     if (seenTriggers.has(entry.trigger)) return false;
     seenTriggers.add(entry.trigger);
@@ -129,19 +118,15 @@ async function loadAliases(): Promise<void> {
 
 export async function initPlugins(): Promise<void> {
   await loadAliases();
-  commandSourceMap.clear();
-  seenTriggers.clear();
   await registry.init();
 }
 
 export async function reloadCommands(bust = false): Promise<void> {
   await loadAliases();
-  commandSourceMap.clear();
-  seenTriggers.clear();
   await (bust ? registry.reload() : registry.refresh());
 }
 
-export function getCommandSource(id: string): "builtin" | "plugin" {
+function getCommandSource(id: string): "builtin" | "plugin" {
   return commandSourceMap.get(id) ?? "plugin";
 }
 
@@ -159,7 +144,7 @@ export function getAllCommandTranslators(): {
     .map((c) => ({ namespace: `commands/${c.id}`, translator: c.instance.t! }));
 }
 
-export function getCommandMap(): Map<
+function getCommandMap(): Map<
   string,
   { instance: BangCommand; id: string }
 > {
@@ -179,7 +164,7 @@ export function getCommandMap(): Map<
   return map;
 }
 
-export type CommandRegistryEntry = {
+type CommandRegistryEntry = {
   id?: string;
   trigger: string;
   name: string;
@@ -226,9 +211,9 @@ export function getCommandRegistry(): CommandRegistryEntry[] {
   return entries;
 }
 
-export async function getFilteredCommandRegistry(): Promise<
-  CommandRegistryEntry[]
-> {
+export async function getFilteredCommandRegistry(
+  bangs: EngineConfig = getDefaultEngineBangConfig(),
+): Promise<CommandRegistryEntry[]> {
   const full = getCommandRegistry();
   const configuredTriggers = new Set<string>();
 
@@ -242,23 +227,22 @@ export async function getFilteredCommandRegistry(): Promise<
     }),
   );
 
-  const engineConfig = getDefaultEngineConfig();
   for (const [shortcut, engineId] of getEngineShortcuts()) {
-    if (engineConfig[engineId] === false) continue;
+    if (!(await isEngineBangAllowed(engineId, bangs))) continue;
     configuredTriggers.add(shortcut);
   }
 
   return full.filter((c) => configuredTriggers.has(c.trigger));
 }
 
-export type CommandApiEntry = CommandRegistryEntry & {
+type CommandApiEntry = CommandRegistryEntry & {
   naturalLanguage: boolean;
 };
 
-export async function getCommandsApiResponse(): Promise<{
+export async function getCommandsApiResponse(bangs?: EngineConfig): Promise<{
   commands: CommandApiEntry[];
 }> {
-  const full = await getFilteredCommandRegistry();
+  const full = await getFilteredCommandRegistry(bangs);
   const commands: CommandApiEntry[] = await Promise.all(
     full.map(async (entry) => {
       const naturalLanguage = entry.id
@@ -309,6 +293,12 @@ export async function getPluginExtensionMeta(
     : NATURAL_LANGUAGE_FIELD;
 
   for (const entry of registry.items()) {
+    if (entry.instance.hideWhenUnconfigured === true) {
+      const configured = entry.instance.isConfigured
+        ? await entry.instance.isConfigured()
+        : true;
+      if (!configured) continue;
+    }
     const baseSchema = entry.instance.settingsSchema ?? [];
     const schema = schemaWithNaturalLanguage(
       baseSchema,
@@ -331,31 +321,7 @@ export async function getPluginExtensionMeta(
     const descKey = `${entry.id}.description`;
     const translatedName = t ? t(nameKey) : nameKey;
     const translatedDesc = t ? t(descKey) : descKey;
-    const translatedSchema = t
-      ? schema.map((field) => {
-          const base = `${entry.id}.settings.${field.key}`;
-          const label = t(`${base}.label`);
-          const desc =
-            field.description !== undefined
-              ? t(`${base}.description`)
-              : undefined;
-          const placeholder =
-            field.placeholder !== undefined
-              ? t(`${base}.placeholder`)
-              : undefined;
-          return {
-            ...field,
-            label: label !== `${base}.label` ? label : field.label,
-            ...(desc !== undefined && desc !== `${base}.description`
-              ? { description: desc }
-              : {}),
-            ...(placeholder !== undefined &&
-            placeholder !== `${base}.placeholder`
-              ? { placeholder }
-              : {}),
-          };
-        })
-      : schema;
+    const translatedSchema = translateSchema(entry.id, schema, t);
     const meta = await buildExtensionMeta({
       id: entry.id,
       displayName:
