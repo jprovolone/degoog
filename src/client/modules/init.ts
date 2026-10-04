@@ -8,35 +8,38 @@ import {
   STICKY_SIDEBAR,
   CENTERED_MODE,
   HIDE_URL_PARAMS,
+  SHOW_RESULT_DATES,
 } from "../constants";
 import { state, defaultImageFilter } from "../state";
-import { initAutocomplete } from "../utils/autocomplete";
-import { idbGet } from "../utils/db";
-import { recordSettingsReturn, showHome } from "../utils/navigation";
-import { performSearch } from "../utils/search-actions";
-import { applyUovaStorage } from "../utils/uovadipasqua";
-import { initTheme } from "../utils/theme";
-import { applyDefaults } from "../utils/sync";
-import { initOptionsDropdown } from "../utils/time-filter";
+import { initAutocomplete } from "../utils/autocomplete/autocomplete";
+import { idbGet } from "../utils/storage/db";
+import { recordSettingsReturn, showHome } from "../utils/navigation/navigation";
+import { performSearch } from "../utils/search/actions/search-actions-perform";
+import { applyUovaStorage } from "../utils/app/uovadipasqua";
+import { initTheme } from "../utils/app/theme";
+import { applyDefaults } from "../utils/storage/sync";
+import { initOptionsDropdown } from "../utils/options-dropdown/time-filter";
 import { initImgFilters } from "./filters/image-filters";
 import { initMediaPreview } from "./media/media-preview";
-import { onOverlayPop } from "../utils/overlay-history";
+import { onOverlayPop } from "../utils/navigation/overlay-history";
 import { performTabSearch } from "./tabs/tab-search";
 import { initTabs } from "./tabs/tabs";
 
-import { copyTextToClipboard } from "../utils/clipboard";
-import { initInstallPrompt } from "../utils/install-prompt";
-import { initKeyboardShortcuts } from "../utils/keyboard-shortcuts";
+import { copyTextToClipboard } from "../utils/dom/clipboard";
+import { initInstallPrompt } from "../utils/app/install-prompt";
+import { initLeakWatch } from "../utils/app/leak-watch";
+import { initPrivacyPolicyLink } from "./modals/privacy-modal/privacy-modal";
+import { initKeyboardShortcuts } from "../shortcuts/keyboard-shortcuts";
 import { initShortcuts } from "../shortcuts/init";
-import { initSearchBarActions } from "../utils/search-bar-actions";
+import { initSearchBarActions } from "../utils/search/search-bar-actions";
 import { renderPageTemplates } from "./renderer/render-page";
 import { initResultActions } from "./result-actions";
 import { initHomeWizard } from "./wizard/wizard";
-import { getBase } from "../utils/base-url";
-import { isSettingsPathname } from "../utils/settings-path";
+import { getBase } from "../utils/net/base-url";
+import { isSettingsPathname } from "../utils/settings/settings-path";
 import type { ImageFilter } from "../types/search";
-import { isImageSearchType } from "../utils/engines";
-import { readImgFilter } from "../utils/url";
+import { isImageSearchType } from "../../shared/search-types";
+import { readImgFilter } from "../utils/net/url";
 
 type DegoogHistoryState = {
   degoog: boolean;
@@ -48,9 +51,11 @@ type DegoogHistoryState = {
 };
 
 export async function init(): Promise<void> {
+  initLeakWatch();
   await applyDefaults();
 
   renderPageTemplates();
+  initPrivacyPolicyLink();
   void applyUovaStorage();
   void initHomeWizard();
 
@@ -108,6 +113,7 @@ export async function init(): Promise<void> {
     });
 
   resultsInput?.addEventListener("keydown", (e) => {
+    if (e.isComposing) return;
     if (e.key === "Enter" && resultsInput)
       void performSearch(resultsInput.value);
   });
@@ -176,6 +182,9 @@ export async function init(): Promise<void> {
   void idbGet<boolean>(INLINE_GIF_PLAYBACK).then((v) => {
     if (v !== null) state.inlineGifPlayback = v;
   });
+  void idbGet<boolean>(SHOW_RESULT_DATES).then((v) => {
+    if (v !== null) state.showResultDates = v;
+  });
   void idbGet<boolean>(STICKY_SIDEBAR).then((v) => {
     if (v !== null) state.stickySidebar = v;
     document
@@ -194,10 +203,12 @@ export async function init(): Promise<void> {
     e.preventDefault();
     e.stopPropagation();
     const uuid = btn.dataset.uuid;
+    btn.dataset.label ??= btn.textContent ?? "";
+    const label = btn.dataset.label;
     const done = (): void => {
-      btn.textContent = "Copied!";
+      if (btn.dataset.copied) btn.textContent = btn.dataset.copied;
       setTimeout(() => {
-        btn.textContent = "Copy";
+        btn.textContent = label;
       }, 1500);
     };
     void copyTextToClipboard(uuid).then((ok) => {
@@ -225,7 +236,9 @@ export async function init(): Promise<void> {
   const type = params.get("type") || postType || "web";
   const page = parseInt(params.get("page") ?? postPage ?? "1", 10) || 1;
   const loadedPage = parseInt(params.get("loaded") ?? "1", 10) || 1;
-  state.restoreInfinitePage = Math.max(page, loadedPage);
+  state.restoreInfinitePage = type.startsWith("tab:")
+    ? 1
+    : Math.max(page, loadedPage);
 
   if (isImageSearchType(type)) state.imageFilter = readImgFilter(params);
 
@@ -300,6 +313,7 @@ export async function init(): Promise<void> {
       if (hs.type?.startsWith("tab:")) {
         void performTabSearch(hs.query, hs.type.slice(4), hs.page);
       } else {
+        state.restoreInfinitePage = Math.max(hs.page || 1, hs.loaded || 1);
         void performSearch(hs.query, hs.type, hs.page);
       }
       return;
@@ -310,7 +324,9 @@ export async function init(): Promise<void> {
       const popType = popParams.get("type") || "web";
       const popPage = parseInt(popParams.get("page") ?? "1", 10) || 1;
       const popLoadedPage = parseInt(popParams.get("loaded") ?? "1", 10) || 1;
-      state.restoreInfinitePage = Math.max(popPage, popLoadedPage);
+      state.restoreInfinitePage = popType.startsWith("tab:")
+        ? 1
+        : Math.max(popPage, popLoadedPage);
       if (isImageSearchType(popType)) state.imageFilter = readImgFilter(popParams);
       else state.imageFilter = defaultImageFilter();
       state.isInitialLoad = true;

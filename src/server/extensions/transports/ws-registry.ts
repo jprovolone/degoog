@@ -1,4 +1,4 @@
-import type { TransportWsHandlers } from "../../types";
+import type { TransportWsHandlers } from "../../types/extension";
 import { getTransportWsSession } from "./ws-session";
 
 const _handlers = new Map<string, TransportWsHandlers>();
@@ -20,6 +20,12 @@ export const mountTransportWs = (name: string, h: TransportWsHandlers): void => 
       h.onClose(ws);
     },
   });
+};
+
+export const pruneTransportWs = (keep: ReadonlySet<string>): void => {
+  for (const name of [..._handlers.keys()]) {
+    if (!keep.has(name)) _handlers.delete(name);
+  }
 };
 
 export const getTransportWsHandlers = (): ReadonlyMap<string, TransportWsHandlers> =>

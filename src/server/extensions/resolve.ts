@@ -1,5 +1,6 @@
-import { getCoreTranslator } from "../routes/pages";
-import { getEngineExtensionMeta, getEngineMap } from "./engines/registry";
+import { getCoreTranslator } from "../render/theme-assets";
+import { getEngineByManifestId, getEngineMap } from "./engines/catalog";
+import { getEngineExtensionMeta } from "./engines/extension-meta";
 import {
   getPluginExtensionMeta,
   getCommandInstanceById,
@@ -22,6 +23,10 @@ import {
 } from "./autocomplete/registry";
 import { getShortcutExtensionMeta } from "./shortcuts/registry";
 import {
+  getFaviconProviderById,
+  getFaviconProviderMetas,
+} from "./favicon/registry";
+import {
   getSearchResultTabById,
   getSearchResultTabExtensionMeta,
   getSearchResultTabs,
@@ -30,18 +35,20 @@ import type {
   AutocompleteProvider,
   BangCommand,
   ExtensionMeta,
+  FaviconProvider,
   GetFieldOptions,
   QueryInterceptor,
   SearchEngine,
   SearchResultTab,
   SlotPlugin,
   Transport,
-} from "../types";
+} from "../types/extension";
 
 const TRANSPORT_SUFFIX = "-transport";
 const AUTOCOMPLETE_SUFFIX = "-autocomplete";
+const FAVICON_SUFFIX = "-favicon";
 
-export interface ResolvedExtension {
+interface ResolvedExtension {
   engine: SearchEngine | null;
   command: BangCommand | null;
   slot: SlotPlugin | null;
@@ -49,6 +56,7 @@ export interface ResolvedExtension {
   tab: SearchResultTab | null;
   transport: Transport | null;
   autocomplete: AutocompleteProvider | null;
+  favicon: FaviconProvider | null;
 }
 
 type LiveTarget = NonNullable<ResolvedExtension[keyof ResolvedExtension]>;
@@ -58,9 +66,21 @@ type OptionsHost = {
   pluginManifest?: { getFieldOptions?: GetFieldOptions };
 };
 
-export const getAllExtensionMeta = async (): Promise<ExtensionMeta[]> => {
+export const getExtensionMetaGroups = async () => {
   const coreT = await getCoreTranslator();
-  const groups = await Promise.all([
+  const [
+    engines,
+    plugins,
+    slots,
+    interceptors,
+    searchBar,
+    tabs,
+    themes,
+    transports,
+    autocomplete,
+    shortcuts,
+    favicon,
+  ] = await Promise.all([
     getEngineExtensionMeta(coreT),
     getPluginExtensionMeta(coreT),
     getSlotExtensionMeta(coreT),
@@ -71,9 +91,25 @@ export const getAllExtensionMeta = async (): Promise<ExtensionMeta[]> => {
     getTransportExtensionMeta(),
     getAutocompleteExtensionMeta(),
     getShortcutExtensionMeta(),
+    getFaviconProviderMetas(),
   ]);
-  return groups.flat();
+  return {
+    engines,
+    plugins,
+    slots,
+    interceptors,
+    searchBar,
+    tabs,
+    themes,
+    transports,
+    autocomplete,
+    shortcuts,
+    favicon,
+  };
 };
+
+const getAllExtensionMeta = async (): Promise<ExtensionMeta[]> =>
+  Object.values(await getExtensionMetaGroups()).flat();
 
 export const findExtensionMeta = async (
   id: string,
@@ -92,7 +128,7 @@ const findTabBySettingsId = (id: string): SearchResultTab | null => {
 };
 
 export const resolveExtension = (id: string): ResolvedExtension => ({
-  engine: getEngineMap()[id] ?? null,
+  engine: getEngineMap()[id] ?? getEngineByManifestId(id),
   command: getCommandInstanceById(id) ?? null,
   slot: findSlotBySettingsId(id),
   interceptor: getInterceptorBySettingsId(id),
@@ -100,6 +136,9 @@ export const resolveExtension = (id: string): ResolvedExtension => ({
   transport: id.endsWith(TRANSPORT_SUFFIX) ? (getTransport(id) ?? null) : null,
   autocomplete: id.endsWith(AUTOCOMPLETE_SUFFIX)
     ? (getAutocompleteProviderById(id) ?? null)
+    : null,
+  favicon: id.endsWith(FAVICON_SUFFIX)
+    ? (getFaviconProviderById(id) ?? null)
     : null,
 });
 
@@ -112,6 +151,7 @@ const liveTargets = (resolved: ResolvedExtension): LiveTarget[] => {
     resolved.tab,
     resolved.transport,
     resolved.autocomplete,
+    resolved.favicon,
   ];
   return entries.filter((entry): entry is LiveTarget => entry !== null);
 };

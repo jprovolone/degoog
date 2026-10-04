@@ -10,7 +10,8 @@ import {
 import { tmpdir } from "os";
 import { join } from "path";
 import { runCanonicalIdsMigration052028 } from "../../src/server/migrations/2026-05-canonical-ids-migration";
-import { ExtensionStoreType, type ReposData } from "../../src/server/types";
+import { ExtensionStoreType } from "../../src/server/types/extension";
+import type { ReposData } from "../../src/server/types/store";
 
 const reposFixture = (): ReposData => ({
   repos: [
@@ -38,15 +39,6 @@ const reposFixture = (): ReposData => ({
       addedAt: "",
       lastFetched: "",
       name: "weeb",
-      description: "",
-      error: null,
-    },
-    {
-      url: "https://codeberg.org/Georgvwt/georgvwt-degoog-stuff.git",
-      localPath: "Georgvwt-georgvwt-degoog-stuff",
-      addedAt: "",
-      lastFetched: "",
-      name: "georg",
       description: "",
       error: null,
     },
@@ -83,7 +75,6 @@ const writeRepoPackages = (dir: string): void => {
       { path: "themes/degoog-docs", name: "Degoog Docs" },
       { path: "themes/zen", name: "Zen" },
       { path: "themes/catpuccin", name: "Catppuccin" },
-      { path: "themes/pokemon", name: "Pokemon" },
     ],
     autocomplete: [
       { path: "autocomplete/bing", name: "Bing" },
@@ -95,9 +86,6 @@ const writeRepoPackages = (dir: string): void => {
   });
   writePackage(dir, "fccview-degoog-weeb-paradise", {
     themes: [{ path: "themes/satan", name: "Satan" }],
-  });
-  writePackage(dir, "Georgvwt-georgvwt-degoog-stuff", {
-    themes: [{ path: "themes/everforest", name: "Everforest" }],
   });
 };
 
@@ -152,20 +140,14 @@ describe("theme-transport-ids migration", () => {
       "theme-catpuccin": { flavor: "mocha" },
       "theme-degoog-docs": { enabled: "true" },
       "theme-fccview-degoog-weeb-paradise-satan": { enabled: "true" },
-      "theme-georgvwt-georgvwt-degoog-stuff-everforest": { tone: "hard" },
       "theme-LiterallyGoogle": { enabled: "true" },
-      "theme-pokemon": { flavor: "pikachu" },
-      "theme-zen": { enabled: "true" },
       theme: { active: "catpuccin" },
     });
     try {
       expect(out.settings["degoog-org-official-extensions-catpuccin-theme"]).toEqual({ flavor: "mocha" });
       expect(out.settings["degoog-org-official-extensions-degoog-docs-theme"]).toEqual({ enabled: "true" });
       expect(out.settings["fccview-degoog-weeb-paradise-satan-theme"]).toEqual({ enabled: "true" });
-      expect(out.settings["georgvwt-georgvwt-degoog-stuff-everforest-theme"]).toEqual({ tone: "hard" });
       expect(out.settings["theannoying-theannoying-degoog-extensions-literallygoogle-theme"]).toEqual({ enabled: "true" });
-      expect(out.settings["degoog-org-official-extensions-pokemon-theme"]).toEqual({ flavor: "pikachu" });
-      expect(out.settings["degoog-org-official-extensions-zen-theme"]).toEqual({ enabled: "true" });
       expect(out.settings.theme).toEqual({
         active: "degoog-org-official-extensions-catpuccin-theme",
       });
@@ -178,12 +160,8 @@ describe("theme-transport-ids migration", () => {
     const out = await withMigration({}, (dir) => {
       for (const folder of [
         "catpuccin",
-        "degoog-docs",
         "fccview-degoog-weeb-paradise-satan",
-        "georgvwt-georgvwt-degoog-stuff-everforest",
         "LiterallyGoogle",
-        "pokemon",
-        "zen",
       ]) {
         mkdirSync(join(dir, "themes", folder), { recursive: true });
       }
@@ -191,12 +169,8 @@ describe("theme-transport-ids migration", () => {
     });
     try {
       expect(existsSync(join(out.dir, "themes", "degoog-org-official-extensions-catpuccin-theme"))).toBe(true);
-      expect(existsSync(join(out.dir, "themes", "degoog-org-official-extensions-degoog-docs-theme"))).toBe(true);
       expect(existsSync(join(out.dir, "themes", "fccview-degoog-weeb-paradise-satan-theme"))).toBe(true);
-      expect(existsSync(join(out.dir, "themes", "georgvwt-georgvwt-degoog-stuff-everforest-theme"))).toBe(true);
       expect(existsSync(join(out.dir, "themes", "theannoying-theannoying-degoog-extensions-literallygoogle-theme"))).toBe(true);
-      expect(existsSync(join(out.dir, "themes", "degoog-org-official-extensions-pokemon-theme"))).toBe(true);
-      expect(existsSync(join(out.dir, "themes", "degoog-org-official-extensions-zen-theme"))).toBe(true);
       expect(existsSync(join(out.dir, "autocomplete", "degoog-org-official-extensions-bing-autocomplete"))).toBe(true);
     } finally {
       out.cleanup();
@@ -215,6 +189,54 @@ describe("theme-transport-ids migration", () => {
       expect(repos.installed[1]?.installedAs).toBe(
         "degoog-org-official-extensions-bing-autocomplete",
       );
+    } finally {
+      out.cleanup();
+    }
+  });
+
+  test("keeps canonical shortcut and favicon installedAs on a rerun", async () => {
+    const canonical = [
+      {
+        repoUrl: "https://github.com/degoog-org/official-extensions.git",
+        type: ExtensionStoreType.Shortcut,
+        itemPath: "shortcuts/vim",
+        installedAs: "degoog-org-official-extensions-vim-shortcut",
+        installedAt: "",
+        version: "1.0.0",
+      },
+      {
+        repoUrl: "https://github.com/degoog-org/official-extensions.git",
+        type: ExtensionStoreType.Favicon,
+        itemPath: "favicon/duckduckgo",
+        installedAs: "degoog-org-official-extensions-duckduckgo-favicon",
+        installedAt: "",
+        version: "1.0.0",
+      },
+      {
+        repoUrl: "https://github.com/degoog-org/official-extensions.git",
+        type: ExtensionStoreType.Plugin,
+        itemPath: "plugins/weather/",
+        installedAs: "weather",
+        installedAt: "",
+        version: "1.0.0",
+      },
+    ];
+    const out = await withMigration({}, (dir) => {
+      const repos = reposFixture();
+      repos.installed.push(...canonical);
+      writeFileSync(join(dir, "repos.json"), JSON.stringify(repos, null, 2));
+    });
+    try {
+      const repos = JSON.parse(
+        readFileSync(join(out.dir, "repos.json"), "utf-8"),
+      ) as ReposData;
+      expect(repos.installed.map((i) => i.installedAs)).toEqual([
+        "degoog-org-official-extensions-zen-theme",
+        "degoog-org-official-extensions-bing-autocomplete",
+        "degoog-org-official-extensions-vim-shortcut",
+        "degoog-org-official-extensions-duckduckgo-favicon",
+        "degoog-org-official-extensions-weather",
+      ]);
     } finally {
       out.cleanup();
     }

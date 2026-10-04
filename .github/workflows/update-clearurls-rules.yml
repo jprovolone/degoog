@@ -63,7 +63,7 @@ jobs:
             src/server/search/clearurls.ts
 
       - name: This will totally fail if upstream served garbage
-        run: bun test tests/unit/clearurls.test.ts
+        run: bun test ./tests/unit/filtering/clearurls.test.ts
 
       - name: Open a PR if anything changed
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1

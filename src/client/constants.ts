@@ -1,5 +1,6 @@
 export {
   ENGINES_KEY as SETTINGS_KEY,
+  ENGINE_BANGS_KEY,
   THEME_KEY,
   OPEN_IN_NEW_TAB_KEY,
   DISPLAY_ENGINE_PERFORMANCE,
@@ -9,11 +10,12 @@ export {
   STICKY_SIDEBAR,
   CENTERED_MODE,
   HIDE_URL_PARAMS,
+  SHOW_RESULT_DATES,
+  ENGINE_ORIGIN_DISPLAY,
   TAB_ORDER_SAVED,
 } from "../shared/sync";
 
 export const DB_NAME = "degoog";
 export const DB_VERSION = 2;
 export const STORE_NAME = "settings";
-export const PER_PAGE = 10;
 export const MAX_PAGE = 10;

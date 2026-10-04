@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
-import { initServerKey } from "../../src/server/utils/server-key";
+import { initServerKey } from "../../src/server/utils/security/server-key";
+import { fakeFaviconProviders, restoreFaviconProviders } from "../helpers/favicon-providers";
 
 let pagesRouter: {
   request: (req: Request | string) => Response | Promise<Response>;
@@ -17,7 +18,7 @@ beforeAll(async () => {
 
   await initServerKey();
   const mod = await import(
-    `../../src/server/routes/pages?pages-test=${Date.now()}`
+    `../../src/server/routes/pages/pages?pages-test=${Date.now()}`
   );
   pagesRouter = mod.default;
 });
@@ -50,5 +51,18 @@ describe("routes/pages", () => {
     const res = await pagesRouter.request("http://localhost/search");
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toContain("text/html");
+  });
+
+  test("GET /search tells the page whether favicon providers exist", async () => {
+    for (const providers of [false, true]) {
+      fakeFaviconProviders(providers);
+      try {
+        const html = await (await pagesRouter.request("http://localhost/search")).text();
+        expect(html).toContain(`window.__DEGOOG_FAVICONS__={"providers":${providers}}`);
+        expect(html).toContain('"refresh":false');
+      } finally {
+        restoreFaviconProviders();
+      }
+    }
   });
 });

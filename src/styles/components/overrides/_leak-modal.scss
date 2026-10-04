@@ -1,0 +1,15 @@
+.leak-modal-actions {
+  display: flex;
+  gap: $space-3;
+}
+
+.leak-modal-continue {
+  background: $danger;
+  color: var(--white);
+
+  &:hover:not(:disabled) {
+    background: $danger;
+    color: var(--white);
+    opacity: 0.9;
+  }
+}

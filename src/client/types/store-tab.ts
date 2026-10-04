@@ -17,7 +17,14 @@ export interface StoreItem {
   name: string;
   description?: string;
   version: string;
-  type: "plugin" | "theme" | "engine" | "transport" | "autocomplete" | "shortcut";
+  type:
+    | "plugin"
+    | "theme"
+    | "engine"
+    | "transport"
+    | "autocomplete"
+    | "shortcut"
+    | "favicon";
   installed: boolean;
   installedVersion?: string;
   updateAvailable?: boolean;

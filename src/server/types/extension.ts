@@ -1,26 +1,14 @@
-import type { CreateCache, UseCache } from "../utils/cache";
-import type { SettingValue } from "../utils/plugin-settings";
-import type { ThreatLevel } from "../utils/sentinel";
-import type {
-  SearchResult,
-  ScoredResult,
-  TimeFilter,
-  EngineContext,
-} from "./search";
-import { SlotPanelPosition } from "../../shared/search-types";
+import type { CreateCache, UseCache } from "../utils/cache/cache";
+import type { SettingValue } from "../utils/settings/plugin-settings";
+import type { ThreatLevel } from "../utils/security/sentinel";
+import type { EngineConfig, EngineContext, TimeFilter } from "./search";
+import {
+  type ScoredResult,
+  type SearchResult,
+  SlotPanelPosition,
+} from "../../shared/search-types";
 import type { FieldOptionsResult } from "../../shared/field-options";
 import type { SettingField } from "../../shared/setting-field";
-
-export type {
-  FieldOption,
-  FieldOptionsResult,
-  FieldOptionsSource,
-} from "../../shared/field-options";
-
-export type {
-  SettingFieldType,
-  SettingField,
-} from "../../shared/setting-field";
 
 export type TranslationVars = string | number | boolean;
 export type TranslationRecord = {
@@ -56,6 +44,7 @@ export enum ExtensionStoreType {
   Transport = "transport",
   Autocomplete = "autocomplete",
   Shortcut = "shortcut",
+  Favicon = "favicon",
 }
 
 export type GetFieldOptions = (
@@ -88,6 +77,8 @@ export interface ExtensionMeta {
   compatibilityLayer?: string;
   extensionDocsAvailable?: boolean;
   defaultEnabled?: boolean;
+  defaultBangEnabled?: boolean;
+  bangShortcut?: string;
   defaultFeedUrls?: string[];
   isClientExposed?: boolean;
   requiresNewerVersion?: boolean;
@@ -103,17 +94,26 @@ export interface PluginContext {
   template: string;
   readFile: (filename: string) => Promise<string>;
   signProxyUrl: (url: string) => string;
+  signFaviconUrl: (url: string) => string;
   fetch?: (url: string, init?: RequestInit) => Promise<Response>;
   /** @deprecated Use `useCache` (async, namespaced, Valkey-backed when enabled). */
   createCache: CreateCache;
   useCache: UseCache;
 }
 
+export const ENGINE_CHALLENGE = {
+  ANUBIS: "anubis",
+} as const;
+
+export type EngineChallenge = (typeof ENGINE_CHALLENGE)[keyof typeof ENGINE_CHALLENGE];
+
 export interface SearchEngine {
   name: string;
   bangShortcut?: string;
   needsAppRestart?: boolean;
+  challenges?: readonly EngineChallenge[];
   settingsSchema?: SettingField[];
+  pluginManifest?: PluginManifest;
   configure?(settings: Record<string, SettingValue>): void;
   getFieldOptions?: GetFieldOptions;
   executeSearch(
@@ -156,6 +156,28 @@ export interface AutocompleteProvider {
   ): Promise<AutocompleteSuggestion[]>;
 }
 
+export type FaviconResult =
+  | { url: string }
+  | { data: Uint8Array; contentType: string }
+  | null;
+
+export interface FaviconContext {
+  fetch: (url: string, init?: RequestInit) => Promise<Response>;
+  userAgent: string;
+  size: number;
+  useCache: UseCache;
+}
+
+export interface FaviconProvider {
+  name: string;
+  description?: string;
+  needsAppRestart?: boolean;
+  settingsSchema?: SettingField[];
+  configure?(settings: Record<string, SettingValue>): void;
+  getFieldOptions?: GetFieldOptions;
+  getFavicon(host: string, context: FaviconContext): Promise<FaviconResult>;
+}
+
 export const SLOT_POSITION_SETTING_KEY = "slotPosition";
 export const SLOT_SEARCH_TYPES_KEY = "slotSearchTypes";
 
@@ -164,9 +186,12 @@ export interface SlotPluginContext {
   results?: ScoredResult[];
   fetch?: (url: string, init?: RequestInit) => Promise<Response>;
   signProxyUrl?: (url: string) => string;
+  signFaviconUrl?: (url: string) => string;
   /** @deprecated Use `useCache` (async, namespaced, Valkey-backed when enabled). */
   createCache: CreateCache;
   useCache: UseCache;
+  locale?: string;
+  nojs?: boolean;
 }
 
 export interface SlotPlugin {
@@ -182,6 +207,7 @@ export interface SlotPlugin {
   priority?: number;
   trigger: (query: string) => boolean | Promise<boolean>;
   waitForResults?: boolean;
+  supportsNojs?: boolean;
   gridSize?: 1 | 2 | 3 | 4;
   execute(
     query: string,
@@ -206,6 +232,9 @@ export interface CommandContext {
   clientIp?: string;
   page?: number;
   signProxyUrl?: (url: string) => string;
+  nojs?: boolean;
+  engines?: EngineConfig;
+  bangs?: EngineConfig;
 }
 
 export interface BangCommand {
@@ -220,6 +249,9 @@ export interface BangCommand {
   configure?(settings: Record<string, SettingValue>): void;
   getFieldOptions?: GetFieldOptions;
   isConfigured?(): Promise<boolean>;
+  hideWhenUnconfigured?: boolean;
+  supportsNojs?: boolean;
+  respectRateLimiting?: boolean;
   init?(context: PluginContext): void | Promise<void>;
   execute(args: string, context?: CommandContext): Promise<CommandResult>;
   t?: Translate;
@@ -326,6 +358,7 @@ export interface Transport {
   description?: string;
   timeoutMs?: number;
   needsAppRestart?: boolean;
+  handlesChallenges?: boolean;
   settingsSchema?: SettingField[];
   configure?(settings: Record<string, SettingValue>): void;
   getFieldOptions?: GetFieldOptions;

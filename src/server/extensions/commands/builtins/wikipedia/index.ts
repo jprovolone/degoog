@@ -1,18 +1,19 @@
+import { renderWikiThumbnail } from "./render";
 import {
-  SlotPanelPosition,
-  TranslateFunction,
   type PluginContext,
-  type SettingField,
   type SlotPlugin,
   type SlotPluginContext,
-} from "../../../../types";
-import type { AsyncTtlCache } from "../../../../utils/cache";
-import { getSettings } from "../../../../utils/plugin-settings";
+  TranslateFunction,
+} from "../../../../types/extension";
+import { SlotPanelPosition } from "../../../../../shared/search-types";
+import type { SettingField } from "../../../../../shared/setting-field";
+import type { AsyncTtlCache } from "../../../../utils/cache/cache";
+import { getSettings } from "../../../../utils/settings/plugin-settings";
 import { logger } from "../../../../utils/logger";
+import { outgoingFetch } from "../../../../utils/net/outgoing";
 const WIKI_NAMESPACE = "ext:wikipedia:page";
 const WIKI_TTL_MS = 60 * 60 * 1000;
 
-const WIKI_SETTINGS_ID = "wikipedia-slot";
 const DEFAULT_WIKI_DOMAIN = "en.wikipedia.org";
 const WIKI_DOMAIN_PATTERN = /^[a-z0-9-]+\.wikipedia\.org$/;
 
@@ -25,8 +26,8 @@ export const toWikiDomain = (raw: unknown): string => {
   return WIKI_DOMAIN_PATTERN.test(cleaned) ? cleaned : DEFAULT_WIKI_DOMAIN;
 };
 
-const _wikiDomain = async (): Promise<string> => {
-  const stored = await getSettings(WIKI_SETTINGS_ID);
+const _wikiDomain = async (settingsId: string): Promise<string> => {
+  const stored = await getSettings(settingsId);
   return toWikiDomain(stored["domain"]);
 };
 
@@ -72,7 +73,7 @@ async function _fetchWikidataThumb(
       props: "claims",
       format: "json",
     });
-    const res = await fetch(
+    const res = await outgoingFetch(
       `https://www.wikidata.org/w/api.php?${params.toString()}`,
       { signal, headers: { "User-Agent": USER_AGENT } },
     );
@@ -88,10 +89,15 @@ async function _fetchWikidataThumb(
       claims["P18"]?.[0]?.mainsnak?.datavalue?.value;
     if (!filename) return undefined;
     const encoded = encodeURIComponent(filename.replace(/ /g, "_"));
-    const resolved = await fetch(
-      `https://commons.wikimedia.org/wiki/Special:FilePath/${encoded}`,
-      { method: "HEAD", redirect: "follow", signal, headers: { "User-Agent": USER_AGENT } },
-    ).then((r) => r.url).catch(() => null);
+    const filePath = `https://commons.wikimedia.org/wiki/Special:FilePath/${encoded}`;
+    const resolved = await outgoingFetch(filePath, {
+      method: "HEAD",
+      redirect: "follow",
+      signal,
+      headers: { "User-Agent": USER_AGENT },
+    })
+      .then((r) => (r.ok ? r.url || filePath : null))
+      .catch(() => null);
     if (!resolved) return undefined;
     return { source: resolved, isLogo: true };
   } catch {
@@ -119,7 +125,7 @@ async function _fetchWikipedia(
       inprop: "url",
       format: "json",
     });
-    const res = await fetch(
+    const res = await outgoingFetch(
       `https://${host}/w/api.php?${params.toString()}`,
       {
         signal: controller.signal,
@@ -177,6 +183,7 @@ const wikipediaSlot: SlotPlugin = {
     return this.t!("wikipedia.description");
   },
   position: SlotPanelPosition.KnowledgePanel,
+  supportsNojs: true,
   isClientExposed: false,
 
   t: TranslateFunction,
@@ -202,7 +209,7 @@ const wikipediaSlot: SlotPlugin = {
   async trigger(query: string): Promise<boolean> {
     const q = query.trim();
     if (q.length < 2 || q.length > 100) return false;
-    const host = await _wikiDomain();
+    const host = await _wikiDomain(this.settingsId ?? "");
     const key = `${host}:${q.toLowerCase()}`;
     const page = await _wikiCache.get(key);
     if (page === null) {
@@ -220,7 +227,7 @@ const wikipediaSlot: SlotPlugin = {
     const sign = ctx?.signProxyUrl ?? _signProxyUrl;
     const proxy = (url: string) => (sign ? sign(url) : "");
     const q = query.trim();
-    const host = await _wikiDomain();
+    const host = await _wikiDomain(this.settingsId ?? "");
     const key = `${host}:${q.toLowerCase()}`;
     let page = await _wikiCache.get(key);
     if (page === null) {
@@ -237,7 +244,11 @@ const wikipediaSlot: SlotPlugin = {
       description: escapeHtml(page.description || ""),
       extract: escapeHtml(page.extract),
       thumbnail: page.thumbnail
-        ? `<img class="${page.thumbnail.isLogo ? "wiki-thumb--logo" : "wiki-thumb"}" src="${escapeHtml(proxy(page.thumbnail.source))}" alt="${escapeHtml(page.title)}" loading="lazy">`
+        ? renderWikiThumbnail(
+            proxy(page.thumbnail.source),
+            page.title,
+            page.thumbnail.isLogo,
+          )
         : "",
       url: page.fullurl ?? `https://${host}/?curid=${page.pageid}`,
     };

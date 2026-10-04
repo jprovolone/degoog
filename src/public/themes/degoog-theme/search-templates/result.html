@@ -31,6 +31,18 @@
 
     <div class="result-body degoog-result--body">
       <div class="result-url-row degoog-result--url-row">
+        {{#if favicon_missing}}
+        <span
+          id="result-favicon-{{ index }}"
+          class="result-favicon-missing degoog-result--favicon-missing"
+          data-tooltip="{{ favicon_missing_tip }}"
+          data-tooltip-start
+          aria-label="{{ favicon_missing_tip }}"
+          role="img"
+          ><i class="fa-solid fa-ghost" aria-hidden="true"></i
+        ></span>
+        {{/if favicon_missing}}
+        {{^if favicon_missing}}
         <img
           id="result-favicon-{{ index }}"
           class="result-favicon degoog-result--favicon"
@@ -39,7 +51,9 @@
           alt=""
           width="26"
           height="26"
+          loading="lazy"
         />
+        {{/if favicon_missing}}
         <cite class="result-cite degoog-result--cite">{{ cite_url }}</cite>
         {{#if insecure}}
         <span
@@ -100,6 +114,16 @@
               {{t:search-templates.result.actions.score}}
             </button>
             {{/if action_score}}
+            {{#if action_refresh}}
+            <button
+              id="result-action-refresh-{{ index }}"
+              type="button"
+              class="result-actions-item degoog-menu-item"
+              role="menuitem"
+            >
+              {{t:search-templates.result.actions.refresh}}
+            </button>
+            {{/if action_refresh}}
           </div>
         </div>
         {{/if show_actions}}
@@ -111,7 +135,7 @@
         rel="{{ link_rel }}"
         >{{ title }}</a
       >
-      <p class="result-snippet degoog-result--snippet">{{ snippet }}</p>
+      <p class="result-snippet degoog-result--snippet">{{#if published_at}}<span class="result-date degoog-result--date">{{ published_at }}</span>{{/if published_at}}{{ snippet }}</p>
       <div class="result-engines degoog-result--engines">
         {{#each sources}}
         {{#if tooltip}}

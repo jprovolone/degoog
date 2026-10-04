@@ -1,12 +1,14 @@
-import type { IndexRow } from "../recorders";
+import type { IndexRow } from "../recorders/default";
 import { getAdapter, bootAdapter } from "../db/factory";
 import { discoverTypes } from "../db/lifecycle";
+import { safeSlug } from "../shared/safe-type";
 import { getIndexerConfig } from "../config/load";
-import { createMutex, type RunExclusive } from "../../utils/mutex";
+import { createMutex, type RunExclusive } from "../../utils/cache/mutex";
 import { logger } from "../../utils/logger";
+import { clearTypeCache } from "../../extensions/engines/search-types";
 
-export const FLUSH_INTERVAL_MS = 3_000;
-export const PRUNE_INTERVAL_MS = 5 * 60_000;
+const FLUSH_INTERVAL_MS = 3_000;
+const PRUNE_INTERVAL_MS = 5 * 60_000;
 
 const _pending = new Map<string, IndexRow[]>();
 const _mutexes = new Map<string, RunExclusive>();
@@ -15,7 +17,7 @@ let _flushTimer: ReturnType<typeof setInterval> | null = null;
 let _pruneTimer: ReturnType<typeof setInterval> | null = null;
 let _starting: Promise<void> | null = null;
 
-export const mutexFor = (type: string): RunExclusive => {
+const mutexFor = (type: string): RunExclusive => {
   let m = _mutexes.get(type);
   if (!m) {
     m = createMutex();
@@ -24,7 +26,24 @@ export const mutexFor = (type: string): RunExclusive => {
   return m;
 };
 
+export const MAX_PENDING_PER_TYPE = 10_000;
+
+const _capWarned = new Set<string>();
+
+const _capBucket = (type: string, bucket: IndexRow[]): void => {
+  const overflow = bucket.length - MAX_PENDING_PER_TYPE;
+  if (overflow <= 0) return;
+  bucket.splice(0, overflow);
+  if (_capWarned.has(type)) return;
+  _capWarned.add(type);
+  logger.error(
+    "indexer",
+    `pending rows for type=${type} hit ${MAX_PENDING_PER_TYPE}, dropping the oldest until the queue flushes`,
+  );
+};
+
 export const enqueue = (rows: IndexRow[]): void => {
+  const touched = new Map<string, IndexRow[]>();
   for (const row of rows) {
     let bucket = _pending.get(row.engine_type);
     if (!bucket) {
@@ -32,16 +51,40 @@ export const enqueue = (rows: IndexRow[]): void => {
       _pending.set(row.engine_type, bucket);
     }
     bucket.push(row);
+    touched.set(row.engine_type, bucket);
   }
+  for (const [type, bucket] of touched) _capBucket(type, bucket);
+};
+
+const _requeue = (type: string, rows: IndexRow[]): number => {
+  const bucket = _pending.get(type) ?? [];
+  const merged = [...rows, ...bucket];
+  const overflow = merged.length - MAX_PENDING_PER_TYPE;
+  if (overflow > 0) {
+    logger.error(
+      "indexer",
+      `dropping ${overflow} unwritten rows for type=${type}, the retry buffer is full at ${MAX_PENDING_PER_TYPE}`,
+    );
+  }
+  const kept = merged.slice(Math.max(0, overflow));
+  _pending.set(type, kept);
+  return kept.length;
 };
 
 const flushType = (type: string, rows: IndexRow[]): Promise<void> =>
   mutexFor(type)(async () => {
     try {
       const cfg = await getIndexerConfig();
+      const isNewType = !discoverTypes().includes(safeSlug(type));
       await getAdapter().writeBatch(type, rows, Date.now(), cfg.rankingWindow);
+      if (isNewType) clearTypeCache();
     } catch (err) {
-      logger.warn("indexer", `flush failed for type=${type}`, err);
+      const kept = _requeue(type, rows);
+      logger.warn(
+        "indexer",
+        `flush failed for type=${type}, ${kept} rows held for the next flush`,
+        err,
+      );
     }
   });
 
@@ -49,6 +92,7 @@ export const flushQueue = async (): Promise<void> => {
   if (_pending.size === 0) return;
   const snapshot = new Map(_pending);
   _pending.clear();
+  _capWarned.clear();
   await Promise.all(
     Array.from(snapshot.entries()).map(([type, rows]) =>
       rows.length > 0 ? flushType(type, rows) : Promise.resolve(),

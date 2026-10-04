@@ -1,14 +1,19 @@
 import * as sass from "sass";
 import * as esbuild from "esbuild";
 
-const result = sass.compile("src/styles/style.scss");
+const SASS_OPTIONS: sass.Options<"sync"> = { silenceDeprecations: ["import"] };
+
+const result = sass.compile("src/styles/style.scss", SASS_OPTIONS);
 await Bun.write("src/public/themes/degoog-theme/style.css", result.css);
+
+const nojsResult = sass.compile("src/styles/nojs.scss", SASS_OPTIONS);
+await Bun.write("src/public/nojs.css", nojsResult.css);
 console.log("SCSS compiled successfully.");
 
 await esbuild.build({
   entryPoints: [
     { in: "src/client/app.ts", out: "app" },
-    { in: "src/client/modules/settings/settings.ts", out: "settings-page" },
+    { in: "src/client/modules/settings/settings.tsx", out: "settings-page" },
   ],
   bundle: true,
   outdir: "src/public",

@@ -1,4 +1,4 @@
-import { switchSettingsTab } from "../settings/settings";
+import { switchSettingsTab } from "../../utils/settings/settings-path";
 import {
   buildRoot,
   ensureInView,

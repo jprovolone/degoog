@@ -90,7 +90,7 @@ const buildWriter = (level: string, namespace: string, args: unknown[]): Writer 
 const flushNonTtyBuf = () => {
   if (!_nonTtyBuf) return;
   const { write, count } = _nonTtyBuf;
-  write(count > 1 ? ` x${count}` : undefined);
+  if (count > 1) write(` x${count}`);
   _nonTtyBuf = null;
 };
 
@@ -100,6 +100,7 @@ const emitNonTTY = (key: string, write: Writer) => {
     return;
   }
   flushNonTtyBuf();
+  write();
   _nonTtyBuf = { write, key, count: 1 };
 };
 

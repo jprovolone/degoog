@@ -1,16 +1,17 @@
 import { describe, test, expect, beforeAll } from "bun:test";
 import {
   initPlugins,
-  getFilteredCommandRegistry,
   getCommandInstanceById,
   getCommandRegistry,
+  getFilteredCommandRegistry,
   matchBangCommand,
 } from "../../src/server/extensions/commands/registry";
+import { DEGOOG_ENGINE_ID } from "../../src/server/extensions/engines/builtins/degoog";
 
 describe("commands registry", () => {
   beforeAll(async () => {
     const { initEngines } =
-      await import("../../src/server/extensions/engines/registry");
+      await import("../../src/server/extensions/engines/loader");
     const origPlugins = process.env.DEGOOG_PLUGINS_DIR;
     const origEngines = process.env.DEGOOG_ENGINES_DIR;
     process.env.DEGOOG_PLUGINS_DIR = "/nonexistent-plugins-dir";
@@ -23,46 +24,39 @@ describe("commands registry", () => {
     else delete process.env.DEGOOG_ENGINES_DIR;
   });
 
-  test("getFilteredCommandRegistry returns array", async () => {
-    const reg = await getFilteredCommandRegistry();
-    expect(Array.isArray(reg)).toBe(true);
-    expect(reg.length).toBeGreaterThan(0);
-  });
-
   test("getCommandInstanceById returns help command by -command id", () => {
     const cmd = getCommandInstanceById("help-command");
     expect(cmd).toBeDefined();
     expect(cmd!.trigger).toBe("help");
   });
 
-  test("matchBangCommand parses !help", () => {
-    const match = matchBangCommand("!help");
-    expect(match).not.toBeNull();
-    if (!match) return;
-    expect(match.type).toBe("command");
-    if (match.type === "command") {
-      expect(match.command.trigger).toBe("help");
+  test("matchBangCommand parses leading and trailing bangs", () => {
+    const leading = matchBangCommand("!help trailing text");
+    expect(leading?.type).toBe("command");
+    if (leading?.type === "command") {
+      expect(leading.command.trigger).toBe("help");
+      expect(leading.args).toBe("trailing text");
+    }
+
+    const trailing = matchBangCommand("some query !help");
+    expect(trailing?.type).toBe("command");
+    if (trailing?.type === "command") {
+      expect(trailing.command.trigger).toBe("help");
+      expect(trailing.args).toBe("some query");
     }
   });
 
-  test("matchBangCommand returns null for non-bang", () => {
+  test("matchBangCommand returns null without a standalone bang", () => {
     expect(matchBangCommand("help")).toBeNull();
-    expect(matchBangCommand("foo")).toBeNull();
-  });
-
-  test("matchBangCommand parses trailing bang: 'some query !help'", () => {
-    const match = matchBangCommand("some query !help");
-    expect(match).not.toBeNull();
-    if (!match) return;
-    expect(match.type).toBe("command");
-    if (match.type === "command") {
-      expect(match.command.trigger).toBe("help");
-      expect(match.args).toBe("some query");
-    }
-  });
-
-  test("matchBangCommand trailing bang returns null without space before !", () => {
     expect(matchBangCommand("foo!help")).toBeNull();
+  });
+
+  test("engine shortcuts follow the bangs the caller allows", async () => {
+    const on = await getFilteredCommandRegistry({ [DEGOOG_ENGINE_ID]: true });
+    expect(on.map((c) => c.trigger)).toContain("degoog");
+    const off = await getFilteredCommandRegistry({ [DEGOOG_ENGINE_ID]: false });
+    expect(off.map((c) => c.trigger)).not.toContain("degoog");
+    expect(off.map((c) => c.trigger)).toContain("help");
   });
 
   test("loaded commands have no duplicate triggers", () => {
@@ -72,12 +66,5 @@ describe("commands registry", () => {
       .map((c) => c.trigger);
     const unique = new Set(builtinTriggers);
     expect(unique.size).toBe(builtinTriggers.length);
-  });
-
-  test("matchBangCommand leading bang still takes priority", () => {
-    const match = matchBangCommand("!help trailing text");
-    expect(match).not.toBeNull();
-    if (!match || match.type !== "command") return;
-    expect(match.args).toBe("trailing text");
   });
 });
