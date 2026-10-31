@@ -67,6 +67,17 @@
       "i2p": [],
       "appearance": "custom",
       "theme": null
+    },
+    {
+      "id": "search-coffeelover-uk",
+      "name": "search.coffeelover.uk",
+      "clearnet": ["https://search.coffeelover.uk"],
+      "tor": [],
+      "i2p": [],
+      "appearance": "custom",
+      "theme": "kaosearch",
+      "country": "DE",
+      "cloudflare": true
     }
   ]
 }

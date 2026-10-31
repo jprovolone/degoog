@@ -51,17 +51,18 @@ const SYMBOLS = {
 } as const;
 
 type Lib = ReturnType<typeof _compile>;
+type Handle = Pointer | bigint;
 
 interface Share {
-  handle: Pointer;
+  handle: Handle;
   busy: number;
   usedAt: number;
 }
 
 interface Inflight {
   id: number;
-  easy: Pointer;
-  transfer: Pointer;
+  easy: Handle;
+  transfer: Handle;
   share: Share;
   wantsCookies: boolean;
 }
@@ -76,16 +77,16 @@ const _compile = (libPath: string) =>
 
 const _cstr = (value: string): Buffer => Buffer.from(`${value}\0`, "utf8");
 
-const _string = (pointer: Pointer | null): string =>
+const _string = (pointer: Handle | null): string =>
   pointer ? new CString(pointer).toString() : "";
 
-const _bytes = (pointer: Pointer | null, length: number): ArrayBuffer =>
+const _bytes = (pointer: Handle | null, length: number): ArrayBuffer =>
   pointer && length > 0
     ? toArrayBuffer(pointer, 0, length).slice(0)
     : new ArrayBuffer(0);
 
 let lib: Lib | null = null;
-let multi: Pointer | null = null;
+let multi: Handle | null = null;
 let pumping = false;
 const shares = new Map<string, Share>();
 const inflight = new Map<number, Inflight>();
@@ -125,12 +126,12 @@ const _release = (entry: Inflight): void => {
   entry.share.usedAt = Date.now();
 };
 
-const _contentEncoding = (transfer: Pointer): string => {
+const _contentEncoding = (transfer: Handle): string => {
   const head = Buffer.from(_bytes(lib!.ci_head(transfer), lib!.ci_head_len(transfer))).toString("latin1");
   return /^content-encoding:\s*(.+)$/im.exec(head)?.[1]?.trim() ?? "";
 };
 
-const _settle = (transfer: Pointer): void => {
+const _settle = (transfer: Handle): void => {
   const entry = inflight.get(Number(transfer));
   if (!entry) return;
   const code = lib!.ci_result(transfer);
@@ -175,7 +176,7 @@ const _pump = async (): Promise<void> => {
   }
 };
 
-const _configure = (easy: Pointer, transfer: Pointer, req: WorkerFetch): void => {
+const _configure = (easy: Handle, transfer: Handle, req: WorkerFetch): void => {
   const l = lib!;
   l.ci_set_str(easy, OPT_URL, _cstr(req.url));
   if (req.proxyUrl) l.ci_set_str(easy, OPT_PROXY, _cstr(req.proxyUrl));

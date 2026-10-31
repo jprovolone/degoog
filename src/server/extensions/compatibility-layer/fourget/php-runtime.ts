@@ -22,12 +22,14 @@ const ALL_EXTS = Object.values(PhpExt);
 
 const PROBE_SNIPPET =
   'echo json_encode(["version"=>PHP_VERSION,"major"=>PHP_MAJOR_VERSION,' +
-  '"minor"=>PHP_MINOR_VERSION,"ext"=>array_map("strtolower",get_loaded_extensions())]);';
+  '"minor"=>PHP_MINOR_VERSION,"ext"=>array_map("strtolower",get_loaded_extensions()),' +
+  '"disabled"=>(string)ini_get("disable_functions")]);';
 
 interface PhpStatus {
   ok: boolean;
   version: string | null;
   missingExts: PhpExt[];
+  disabledFunctions: string[];
   reason: string | null;
 }
 
@@ -36,9 +38,48 @@ interface ProbePayload {
   major: number;
   minor: number;
   ext: string[];
+  disabled: string;
 }
 
 export const phpBinary = (): string => process.env.DEGOOG_PHP_BIN ?? "php";
+
+const DISABLED_FUNCTIONS = [
+  "exec",
+  "shell_exec",
+  "system",
+  "passthru",
+  "proc_open",
+  "popen",
+  "pcntl_exec",
+  "pcntl_fork",
+  "putenv",
+  "dl",
+  "mail",
+  "mb_send_mail",
+  "imap_open",
+  "imap_mail",
+];
+
+export const phpRunnerArgs = (hostDisabled: string[] = []): string[] => [
+  "-d",
+  "display_errors=stderr",
+  "-d",
+  "html_errors=0",
+  "-d",
+  "sendmail_path=/bin/false",
+  "-d",
+  "ffi.enable=0",
+  "-d",
+  `disable_functions=${[...new Set([...hostDisabled, ...DISABLED_FUNCTIONS])].join(",")}`,
+];
+
+const _parseDisabled = (raw: unknown): string[] =>
+  typeof raw === "string"
+    ? raw
+        .split(",")
+        .map((name) => name.trim())
+        .filter(Boolean)
+    : [];
 
 const _probe = async (): Promise<PhpStatus> => {
   const proc = Bun.spawn([phpBinary(), "-d", "display_errors=stderr", "-r", PROBE_SNIPPET], {
@@ -69,17 +110,22 @@ const _probe = async (): Promise<PhpStatus> => {
     ok: reasons.length === 0,
     version: parsed.version ?? null,
     missingExts,
+    disabledFunctions: _parseDisabled(parsed.disabled),
     reason: reasons.length > 0 ? reasons.join("; ") : null,
   };
 };
 
 let _cached: { at: number; status: PhpStatus } | null = null;
+let _hostDisabled: string[] = [];
+
+export const hostDisabledFunctions = (): string[] => _hostDisabled;
 
 export const phpStatus = async (): Promise<PhpStatus> => {
   if (_cached && Date.now() - _cached.at < PROBE_TTL_MS) return _cached.status;
   let status: PhpStatus;
   try {
     status = await _probe();
+    _hostDisabled = status.disabledFunctions;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.warn(
@@ -91,6 +137,7 @@ export const phpStatus = async (): Promise<PhpStatus> => {
       ok: false,
       version: null,
       missingExts: [...ALL_EXTS],
+      disabledFunctions: [],
       reason: `php not runnable: ${message}`,
     };
   }

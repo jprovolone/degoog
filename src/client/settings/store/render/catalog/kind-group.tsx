@@ -35,7 +35,7 @@ export const KindGroup = ({
           <button
             type="button"
             class="store-show-all store-group-more"
-            onClick={() => actions.showKind(kind)}
+            onClick={() => actions.setKind(kind)}
           >
             {st("show-all", { count: items.length.toLocaleString() })}
           </button>

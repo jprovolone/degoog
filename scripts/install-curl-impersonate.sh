@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-VERSION=1.2.2
+VERSION=2.3.1
 INSTALL_DIR="${CURL_IMPERSONATE_INSTALL_DIR:-/usr/local/bin}"
 LIB_DIR="${CURL_IMPERSONATE_LIB_DIR:-/usr/local/lib}"
 RELEASE="https://github.com/lexiforest/curl-impersonate/releases/download/v${VERSION}"

@@ -134,7 +134,6 @@ export interface StoreActions {
   setQuery: (value: string) => void;
   clearQuery: () => void;
   setKind: (kind: StoreKind, focus?: boolean) => void;
-  showKind: (kind: StoreKind) => void;
   setStatus: (status: StoreStatus) => void;
   setSub: (sub: string) => void;
   toggleRepoPop: () => void;

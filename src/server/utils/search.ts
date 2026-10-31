@@ -111,12 +111,13 @@ export const resolveLanguages = (
 export const _applyRateLimit = async (
   c: Context,
   bucket = "",
+  scale = 1,
 ): Promise<Response | null> => {
   const settings = await getInstanceSettings();
   const opts = rateLimitOptionsFrom(settings);
   if (opts.rateLimitEnabled !== "true") return null;
   const ip = getClientIp(c) ?? "unknown";
-  const result = checkRateLimit(`${bucket}${ip}`, opts);
+  const result = checkRateLimit(`${bucket}${ip}`, opts, scale);
   if (!result.allowed && result.retryAfterSec !== undefined) {
     return c.json({ error: "Too many requests" }, 429, {
       "Retry-After": String(result.retryAfterSec),
