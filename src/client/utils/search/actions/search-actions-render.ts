@@ -2,6 +2,7 @@ import { SkeletonImageGrid } from "../../../animations/skeleton/skeleton-image-g
 import { SkeletonResults } from "../../../animations/skeleton/skeleton-results";
 import { SkeletonSidebar } from "../../../animations/skeleton/skeleton-sidebar";
 import { clear, render } from "../../../../shared/ui/tribute/dom";
+import { NoResults } from "../../../../shared/ui/components/feedback/no-results";
 import {
   closeMediaPreview,
   MediaPreviewCloseMode,
@@ -51,12 +52,17 @@ type Navigate = (query: string) => void;
 
 let sidebarSuggestionsController: AbortController | null = null;
 
+const abortSidebarSuggestions = (): void => {
+  sidebarSuggestionsController?.abort();
+  sidebarSuggestionsController = null;
+};
+
 export const loadSidebarSuggestions = (
   query: string,
   type: string,
   navigate: Navigate,
 ): void => {
-  sidebarSuggestionsController?.abort();
+  abortSidebarSuggestions();
   state.currentRelatedSearches = [];
   if (isImageSearchType(type) || !state.displaySearchSuggestions) return;
 
@@ -130,6 +136,27 @@ export const prepareResultsUi = (query: string, resolvedType: string): void => {
   document.title = `${query || (currentSearchImage() ? coreT("search-image.title") : "")} - degoog`;
 };
 
+export const showSearchFailure = (message: string): void => {
+  abortSidebarSuggestions();
+  state.currentRelatedSearches = [];
+  abortSlotPanels();
+  abortGlancePanels();
+  clearSlotPanels();
+  const resultsMeta = document.getElementById("results-meta");
+  if (resultsMeta) resultsMeta.textContent = "";
+  const glanceEl = document.getElementById("at-a-glance");
+  if (glanceEl) clear(glanceEl);
+  const sidebar = document.getElementById("results-sidebar");
+  if (sidebar) clear(sidebar);
+  const resultsList = document.getElementById("results-list");
+  if (resultsList) render(NoResults({ children: message }), resultsList);
+};
+
+export const searchFailureMessage = (status?: number): string =>
+  status === 429
+    ? t("search-templates.rate-limited")
+    : t("search-templates.search-failed");
+
 export const pushSearchHistory = (
   query: string,
   resolvedType: string,
@@ -180,7 +207,10 @@ export const renderSearchResponse = (
   state.currentData = data;
   state.lastPage = declaredPages(data.totalPages);
 
-  const metaText = `About ${data.results.length} results (${(data.totalTime / 1000).toFixed(2)} seconds)`;
+  const metaText = t("search-templates.status.done", {
+    count: String(data.results.length),
+    time: (data.totalTime / 1000).toFixed(2),
+  });
   setResultsMeta(metaText);
 
   const glanceEl = document.getElementById("at-a-glance");

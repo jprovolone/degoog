@@ -92,13 +92,16 @@ const _evictOldest = (): void => {
 export const checkRateLimit = (
   ip: string,
   options: RateLimitOptions,
+  scale = 1,
 ): { allowed: boolean; retryAfterSec?: number } => {
   if (options.rateLimitEnabled !== "true") {
     return { allowed: true };
   }
 
-  const { burstWindowSec, burstMax, longWindowSec, longMax } =
-    parseRateLimitOptions(options);
+  const parsed = parseRateLimitOptions(options);
+  const { burstWindowSec, longWindowSec } = parsed;
+  const burstMax = parsed.burstMax * scale;
+  const longMax = parsed.longMax * scale;
   const now = Date.now();
   const key = ip || "unknown";
 

@@ -74,6 +74,37 @@ describe("rate-limit", () => {
     });
   });
 
+  describe("checkRateLimit scale", () => {
+    test("a scaled bucket allows that many times the burst", () => {
+      const opts = {
+        rateLimitEnabled: "true",
+        rateLimitBurstWindow: "20",
+        rateLimitBurstMax: "2",
+        rateLimitLongWindow: "600",
+        rateLimitLongMax: "150",
+      };
+      for (let i = 0; i < 8; i++) {
+        expect(checkRateLimit("10.0.0.1", opts, 4)).toEqual({ allowed: true });
+      }
+      expect(checkRateLimit("10.0.0.1", opts, 4).allowed).toBe(false);
+    });
+
+    test("scaling stays above the 1000 request cap on settings", () => {
+      const opts = {
+        rateLimitEnabled: "true",
+        rateLimitBurstWindow: "20",
+        rateLimitBurstMax: "1000",
+        rateLimitLongWindow: "600",
+        rateLimitLongMax: "1000",
+      };
+      for (let i = 0; i < 2000; i++) checkRateLimit("10.0.0.1", opts, 2);
+      expect(checkRateLimit("10.0.0.1", opts, 2).allowed).toBe(false);
+      clearRateLimitState();
+      for (let i = 0; i < 1500; i++) checkRateLimit("10.0.0.1", opts, 2);
+      expect(checkRateLimit("10.0.0.1", opts, 2).allowed).toBe(true);
+    });
+  });
+
   describe("checkRateLimit different IPs", () => {
     test("each IP has independent limit", () => {
       const opts = {

@@ -20,3 +20,5 @@ A machine readable version of this list lives in [instances.json](./instances.js
 [https://nepnir.com](https://nepnir.com) (Zen)
 
 [https://degoog.ogservers.org](https://degoog.ogservers.org) (Custom)
+
+[https://search.coffeelover.uk](https://search.coffeelover.uk) (kaosearch)

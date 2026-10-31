@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { getSlotPlugins } from "../../extensions/slots/registry";
 import {
   DEFAULT_SEARCH_TYPE,
@@ -21,6 +21,12 @@ const router = new Hono();
 
 type SlotBody = { query?: string; type?: string; results?: ScoredResult[] };
 
+const SLOT_CALLS_PER_SEARCH = 4;
+
+const _guardSlotCall = async (c: Context): Promise<Response | null> =>
+  (await _applyRateLimit(c, "slots:", SLOT_CALLS_PER_SEARCH)) ??
+  (await guardApiKey(c, "apiKeySearchEnabled"));
+
 const _sealedResults = (body: SlotBody): ScoredResult[] | undefined =>
   Array.isArray(body.results) ? body.results.filter(isSealedResult) : undefined;
 
@@ -28,10 +34,8 @@ const _requestedType = (raw: unknown): string =>
   typeof raw === "string" && raw.trim() ? raw.trim() : DEFAULT_SEARCH_TYPE;
 
 router.post("/api/slots", publicBodyLimit, async (c) => {
-  const limitRes = await _applyRateLimit(c);
-  if (limitRes) return limitRes;
-  const authRes = await guardApiKey(c, "apiKeySearchEnabled");
-  if (authRes) return authRes;
+  const blocked = await _guardSlotCall(c);
+  if (blocked) return blocked;
   const body = await readObjectBody<SlotBody>(c);
   if (!body) return c.json({ error: "Invalid JSON" }, 400);
   if (!body.query || !body.query.trim()) return c.json({ panels: [] });
@@ -54,10 +58,8 @@ router.post("/api/slots", publicBodyLimit, async (c) => {
 });
 
 router.post("/api/slots/glance", publicBodyLimit, async (c) => {
-  const limitRes = await _applyRateLimit(c);
-  if (limitRes) return limitRes;
-  const authRes = await guardApiKey(c, "apiKeySearchEnabled");
-  if (authRes) return authRes;
+  const blocked = await _guardSlotCall(c);
+  if (blocked) return blocked;
   const body = await readObjectBody<SlotBody>(c);
   if (!body) return c.json({ error: "Invalid JSON" }, 400);
   if (!body.query || !body.query.trim()) {

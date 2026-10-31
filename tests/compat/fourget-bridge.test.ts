@@ -10,6 +10,7 @@ import {
 } from "../../src/server/extensions/compatibility-layer/rpc";
 import {
   phpBinary,
+  phpRunnerArgs,
   phpStatus,
 } from "../../src/server/extensions/compatibility-layer/fourget/php-runtime";
 import { FOURGET_PAGES } from "../../src/server/extensions/compatibility-layer/fourget/pages";
@@ -121,7 +122,7 @@ class demo {
 
 const SPEC: RunnerSpec = {
   bin: phpBinary(),
-  args: ["-d", "display_errors=stderr", "-d", "html_errors=0"],
+  args: phpRunnerArgs(),
   label: "4get",
 };
 
@@ -320,5 +321,43 @@ describe("4get php bridge", () => {
     });
     expect(out.engines.length).toBe(2);
     for (const engine of out.engines) expect(engine.error).toBeUndefined();
+  });
+
+  test("functions the host php.ini disables stay disabled", () => {
+    const directive = phpRunnerArgs(["curl_exec", "exec"]).find((arg) =>
+      arg.startsWith("disable_functions="),
+    );
+    const names = directive!.slice("disable_functions=".length).split(",");
+    expect(names).toContain("curl_exec");
+    expect(names).toContain("exec");
+    expect(names).toContain("proc_open");
+    expect(names.filter((name) => name === "exec")).toHaveLength(1);
+  });
+
+  maybe("a scraper cannot spawn processes or send mail", async () => {
+    const calls = [
+      "system('id')",
+      "shell_exec('id')",
+      "exec('id')",
+      "proc_open('id', [], $p)",
+      "popen('id', 'r')",
+      "mail('a@b.c', 's', 'm')",
+      "mb_send_mail('a@b.c', 's', 'm')",
+    ];
+    for (const call of calls) {
+      const fn = call.slice(0, call.indexOf("("));
+      const code = `shell_${fn}`;
+      const src = join(root, "scraper", `${code}.php`);
+      writeFileSync(
+        src,
+        FAKE_SCRAPER.replace("class demo", `class ${code}`).replace(
+          "public function web($get){",
+          `public function web($get){\n\t\t${call};`,
+        ),
+      );
+      await expect(search({ code, scrapers: [{ code, src }] })).rejects.toThrow(
+        new RegExp(`undefined function \\S*\\b${fn}\\(`),
+      );
+    }
   });
 });
